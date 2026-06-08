@@ -27,7 +27,10 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPublic =
-    path === "/" || path.startsWith("/login") || path.startsWith("/auth");
+    path === "/" ||
+    path.startsWith("/login") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/api"); // route handlers (e.g. cron) authenticate themselves
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

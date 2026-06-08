@@ -1,0 +1,26 @@
+name: Sync match results
+
+# Auto-applies finished World Cup results + scores predictions by calling the
+# app's /api/cron/sync-results route. Runs on a schedule and on manual dispatch.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   APP_URL      e.g. https://world-cup-predection.vercel.app   (no trailing slash)
+#   CRON_SECRET  the same value set in the app's environment
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub may delay scheduled runs under load.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger results sync
+        run: |
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/sync-results")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          test "$code" = "200"

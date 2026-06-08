@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/tournament", label: "Champion", icon: "👑" },
   { href: "/predictions", label: "My Picks", icon: "📋" },
   { href: "/leaderboard", label: "Ranking", icon: "📊" },
+  { href: "/scoring", label: "Scoring", icon: "🧮" },
 ];
 
 export function Nav() {
