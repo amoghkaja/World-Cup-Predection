@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0f0d;
+  --surface: #121a17;
+  --surface-2: #1a2521;
+  --border: #25332d;
+  --foreground: #e8f0ec;
+  --muted: #8aa093;
+  --primary: #10b981; /* emerald */
+  --primary-fg: #04130d;
+  --accent: #f5c518; /* gold */
+  --danger: #ef4444;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.9rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(16, 185, 129, 0.12), transparent),
+    radial-gradient(900px 500px at -10% 10%, rgba(245, 197, 24, 0.07), transparent),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    border-radius: 0.7rem;
+    padding: 0.6rem 1rem;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-fg);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-ghost {
+    background: var(--surface-2);
+    color: var(--foreground);
+    border-color: var(--border);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--border);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .input {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    color: var(--foreground);
+    width: 100%;
+  }
+  .input:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+  }
+}

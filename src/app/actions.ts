@@ -1,0 +1,301 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import {
+  scorePrediction,
+  CHAMPION_POINTS,
+  FINALIST_POINTS,
+  GROUP_QUALIFIER_POINTS,
+} from "@/lib/scoring";
+import type { Match, PredOutcome, Prediction } from "@/lib/types";
+
+type Result<T = void> = { ok: true; data?: T } | { ok: false; error: string };
+
+async function requireUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  return { supabase, user };
+}
+
+async function requireAdmin() {
+  const { supabase, user } = await requireUser();
+  const { data } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (!data?.is_admin) throw new Error("Admin only");
+  return { user };
+}
+
+// ---------------- Match predictions ----------------
+export async function savePrediction(input: {
+  matchId: number;
+  outcome: PredOutcome;
+  homeScore: number;
+  awayScore: number;
+}): Promise<Result> {
+  try {
+    const { supabase, user } = await requireUser();
+
+    const home = Math.max(0, Math.min(20, Math.round(input.homeScore)));
+    const away = Math.max(0, Math.min(20, Math.round(input.awayScore)));
+    if (!["home", "away", "draw"].includes(input.outcome)) {
+      return { ok: false, error: "Invalid outcome" };
+    }
+
+    // Deadline check (RLS is the backstop, this gives a friendly error).
+    const { data: match } = await supabase
+      .from("matches")
+      .select("kickoff_at, home_team_id, away_team_id")
+      .eq("id", input.matchId)
+      .single();
+    if (!match) return { ok: false, error: "Match not found" };
+    if (new Date(match.kickoff_at).getTime() <= Date.now()) {
+      return { ok: false, error: "This match is locked — the deadline has passed." };
+    }
+
+    const { error } = await supabase.from("predictions").upsert(
+      {
+        user_id: user.id,
+        match_id: input.matchId,
+        pred_home_score: home,
+        pred_away_score: away,
+        pred_outcome: input.outcome,
+        submitted_at: new Date().toISOString(),
+        points_awarded: 0,
+        scored: false,
+      },
+      { onConflict: "user_id,match_id" }
+    );
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/dashboard");
+    revalidatePath("/bracket");
+    revalidatePath(`/matches/${input.matchId}`);
+    revalidatePath("/predictions");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------- Group qualifier predictions ----------------
+export async function saveGroupPrediction(input: {
+  groupLabel: string;
+  winnerId: number | null;
+  runnerupId: number | null;
+}): Promise<Result> {
+  try {
+    const { supabase, user } = await requireUser();
+    if (input.winnerId && input.winnerId === input.runnerupId) {
+      return { ok: false, error: "Winner and runner-up must be different teams." };
+    }
+    const { error } = await supabase.from("group_predictions").upsert(
+      {
+        user_id: user.id,
+        group_label: input.groupLabel,
+        pred_winner_team_id: input.winnerId,
+        pred_runnerup_team_id: input.runnerupId,
+        submitted_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,group_label" }
+    );
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/groups");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------- Tournament predictions (champion etc.) ----------------
+export async function saveTournamentPrediction(input: {
+  type: "champion" | "finalist" | "golden_boot";
+  teamId: number | null;
+  textValue?: string | null;
+}): Promise<Result> {
+  try {
+    const { supabase, user } = await requireUser();
+    // single champion pick: clear previous of same type first
+    await supabase
+      .from("tournament_predictions")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("type", input.type);
+
+    const { error } = await supabase.from("tournament_predictions").insert({
+      user_id: user.id,
+      type: input.type,
+      team_id: input.teamId,
+      text_value: input.textValue ?? null,
+      submitted_at: new Date().toISOString(),
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/tournament");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------- Profile ----------------
+export async function updateDisplayName(name: string): Promise<Result> {
+  try {
+    const { supabase, user } = await requireUser();
+    const clean = name.trim().slice(0, 40);
+    if (!clean) return { ok: false, error: "Name cannot be empty" };
+    const { error } = await supabase
+      .from("profiles")
+      .update({ display_name: clean })
+      .eq("id", user.id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/profile");
+    revalidatePath("/leaderboard");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------- Admin: enter result & rescore ----------------
+export async function saveMatchResult(input: {
+  matchId: number;
+  homeScore: number;
+  awayScore: number;
+  winnerTeamId: number | null; // advancer for knockout draws
+}): Promise<Result> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
+
+    const home = Math.max(0, Math.round(input.homeScore));
+    const away = Math.max(0, Math.round(input.awayScore));
+
+    const { data: updated, error: upErr } = await admin
+      .from("matches")
+      .update({
+        home_score: home,
+        away_score: away,
+        winner_team_id: input.winnerTeamId,
+        status: "final",
+      })
+      .eq("id", input.matchId)
+      .select("*")
+      .single();
+    if (upErr || !updated) return { ok: false, error: upErr?.message ?? "Match not found" };
+
+    // Rescore every prediction for this match.
+    const { data: preds } = await admin
+      .from("predictions")
+      .select("*")
+      .eq("match_id", input.matchId);
+    for (const p of (preds ?? []) as Prediction[]) {
+      const pts = scorePrediction(p, updated as Match);
+      await admin
+        .from("predictions")
+        .update({ points_awarded: pts, scored: true })
+        .eq("id", p.id);
+    }
+
+    revalidatePath("/leaderboard");
+    revalidatePath("/predictions");
+    revalidatePath("/admin/results");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// Admin: assign teams to a knockout match (unlocks predictions for it).
+export async function setMatchTeams(input: {
+  matchId: number;
+  homeTeamId: number | null;
+  awayTeamId: number | null;
+}): Promise<Result> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("matches")
+      .update({ home_team_id: input.homeTeamId, away_team_id: input.awayTeamId })
+      .eq("id", input.matchId);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/bracket");
+    revalidatePath("/admin/results");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// Admin: settle a group's actual winner/runner-up and award qualifier points.
+export async function settleGroup(input: {
+  groupLabel: string;
+  winnerId: number;
+  runnerupId: number;
+}): Promise<Result> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
+    const { data: preds } = await admin
+      .from("group_predictions")
+      .select("*")
+      .eq("group_label", input.groupLabel);
+    for (const p of preds ?? []) {
+      let pts = 0;
+      if (p.pred_winner_team_id === input.winnerId) pts += GROUP_QUALIFIER_POINTS;
+      if (p.pred_runnerup_team_id === input.runnerupId) pts += GROUP_QUALIFIER_POINTS;
+      await admin
+        .from("group_predictions")
+        .update({ points_awarded: pts, scored: true })
+        .eq("id", p.id);
+    }
+    revalidatePath("/leaderboard");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// Admin: settle the champion (and optionally finalists) and award points.
+export async function settleTournament(input: {
+  championId: number;
+  finalistIds?: number[];
+}): Promise<Result> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
+
+    const { data: champPreds } = await admin
+      .from("tournament_predictions")
+      .select("*")
+      .eq("type", "champion");
+    for (const p of champPreds ?? []) {
+      const pts = p.team_id === input.championId ? CHAMPION_POINTS : 0;
+      await admin
+        .from("tournament_predictions")
+        .update({ points_awarded: pts, scored: true })
+        .eq("id", p.id);
+    }
+
+    if (input.finalistIds?.length) {
+      const { data: finPreds } = await admin
+        .from("tournament_predictions")
+        .select("*")
+        .eq("type", "finalist");
+      for (const p of finPreds ?? []) {
+        const pts = input.finalistIds.includes(p.team_id ?? -1) ? FINALIST_POINTS : 0;
+        await admin
+          .from("tournament_predictions")
+          .update({ points_awarded: pts, scored: true })
+          .eq("id", p.id);
+      }
+    }
+
+    revalidatePath("/leaderboard");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
