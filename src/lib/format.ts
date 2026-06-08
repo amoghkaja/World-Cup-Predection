@@ -1,5 +1,10 @@
 /** Display helpers (deterministic, locale-stable to avoid hydration mismatches). */
 
+/** Current epoch ms. Wrapped so server components can read the clock at request time. */
+export function serverNow(): number {
+  return Date.now();
+}
+
 export function formatKickoff(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString("en-US", {

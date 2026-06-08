@@ -7,9 +7,13 @@ export function Countdown({ kickoff, className }: { kickoff: string; className?:
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
-    setNow(Date.now());
+    // Set the initial value off the render path (rAF), then tick every second.
+    const raf = requestAnimationFrame(() => setNow(Date.now()));
     const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(t);
+    };
   }, []);
 
   // Render nothing time-sensitive until mounted (avoids hydration mismatch).

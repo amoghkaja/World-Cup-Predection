@@ -1,12 +1,12 @@
 import { getMatches, getMyPredictions } from "@/lib/queries";
-import { isLocked } from "@/lib/format";
+import { isLocked, serverNow } from "@/lib/format";
 import { MatchCard } from "@/components/MatchCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const [matches, preds] = await Promise.all([getMatches(), getMyPredictions()]);
-  const now = Date.now();
+  const now = serverNow();
 
   const upcoming = matches.filter((m) => !isLocked(m.kickoff_at, now));
   const locked = matches.filter((m) => isLocked(m.kickoff_at, now)).reverse();
