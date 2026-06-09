@@ -8,9 +8,10 @@ name: Sync match results
 #   CRON_SECRET  the same value set in the app's environment
 
 on:
-  schedule:
-    # Every 30 minutes. GitHub may delay scheduled runs under load.
-    - cron: "*/30 * * * *"
+  # Scheduled runs are PAUSED until the results data source is finalized and the
+  # APP_URL / CRON_SECRET repo secrets are set. Re-enable by uncommenting this block.
+  # schedule:
+  #   - cron: "*/30 * * * *"   # every 30 min
   workflow_dispatch: {}
 
 jobs:
@@ -18,9 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger results sync
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL / CRON_SECRET not configured — skipping (set repo secrets to enable)."
+            exit 0
+          fi
           code=$(curl -s -o /tmp/out.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/cron/sync-results")
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/sync-results")
           echo "HTTP $code"; cat /tmp/out.json; echo
           test "$code" = "200"
