@@ -8,6 +8,7 @@ import { Flag } from "@/components/TeamBadge";
 import { Icon } from "@/components/Icon";
 import { PointsBadge } from "@/components/PointsBadge";
 import { PredictionForm } from "@/components/PredictionForm";
+import { Countdown } from "@/components/Countdown";
 
 // One row of the My Predictions list. Open matches can be edited inline; settled
 // matches show the result + points; in-progress matches are read-only.
@@ -47,14 +48,19 @@ export function CompactPredictionRow({
             <span style={{ fontWeight: 700, fontSize: 14 }}>{away?.code ?? "?"}</span>
             <Flag flag={away?.flag_emoji} name={away?.name} size="sm" />
           </div>
-          <span className="t-xs" style={{ color: "var(--text-3)" }}>
-            {match.group_label ? `Group ${match.group_label}` : "Knockout"}
-            {settled
-              ? ` · Final ${match.home_score}–${match.away_score}`
-              : locked
-                ? " · In progress"
-                : " · Awaiting kickoff"}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="t-xs" style={{ color: "var(--text-3)" }}>
+              {match.group_label ? `Group ${match.group_label}` : "Knockout"}
+              {settled
+                ? ` · Final ${match.home_score}–${match.away_score}`
+                : locked
+                  ? " · In progress"
+                  : ""}
+            </span>
+            {!settled && !locked && (
+              <Countdown kickoff={match.kickoff_at} variant="labeled" lockLabel="Locks in" />
+            )}
+          </div>
         </div>
 
         {settled ? (

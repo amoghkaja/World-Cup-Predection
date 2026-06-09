@@ -3,64 +3,47 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { scorePrediction } from "@/lib/scoring";
 import type { Match, MatchStage, Prediction, Team } from "@/lib/types";
 
-// Pulls finished FIFA World Cup 2026 results from API-Football, applies them to
-// our matches, and re-scores every prediction — the same logic the admin panel
-// uses (scorePrediction), so auto-applied results score identically.
+// Single call to football-data.org returns all 104 World Cup matches. We update
+// kickoff times, fill knockout teams as the bracket fills, apply final scores, and
+// re-score predictions — the same scorePrediction the admin panel uses.
 //
-// Trigger with the CRON_SECRET, e.g.:
-//   curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/sync-results
-// Vercel Cron and the GitHub Action both send that header automatically.
+// Trigger:  curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/sync-results
 
 export const dynamic = "force-dynamic";
 
-const API_BASE = "https://v3.football.api-sports.io";
-const WORLD_CUP_LEAGUE = 1; // API-Football league id for the World Cup
-const SEASON = 2026;
-const FINISHED = new Set(["FT", "AET", "PEN"]); // statuses that count as a final result
+const API = "https://api.football-data.org/v4/competitions/WC/matches";
 
-// ---- API-Football response shapes (only the fields we use) ----
-interface ApiTeam {
+const STAGE_MAP: Record<string, MatchStage> = {
+  GROUP_STAGE: "group",
+  LAST_32: "r32",
+  LAST_16: "r16",
+  QUARTER_FINALS: "qf",
+  SEMI_FINALS: "sf",
+  THIRD_PLACE: "third",
+  FINAL: "final",
+};
+const FINISHED = new Set(["FINISHED", "AWARDED"]);
+
+interface FdTeam {
+  id: number | null;
+  name: string | null;
+  tla: string | null;
+}
+interface FdMatch {
   id: number;
-  name: string;
-  winner: boolean | null;
+  utcDate: string;
+  status: string;
+  stage: string;
+  group: string | null;
+  homeTeam: FdTeam;
+  awayTeam: FdTeam;
+  score: { winner: string | null; fullTime: { home: number | null; away: number | null } };
 }
-interface ApiGoals {
-  home: number | null;
-  away: number | null;
-}
-interface ApiFixture {
-  fixture: { id: number; date: string; status: { short: string } };
-  league: { round: string };
-  teams: { home: ApiTeam; away: ApiTeam };
-  goals: ApiGoals;
-  score: { fulltime: ApiGoals; extratime: ApiGoals | null; penalty: ApiGoals | null };
-}
-interface ApiResponse {
-  response?: ApiFixture[];
-  errors?: unknown;
+interface FdResponse {
+  matches?: FdMatch[];
+  message?: string;
 }
 
-interface SyncReport {
-  applied: { id: number; teams: string; score: string }[];
-  unchanged: number[];
-  unresolvedTeams: string[];
-  unmatchedFixtures: string[];
-  notFinished: number;
-}
-
-function roundToStage(round: string): MatchStage | null {
-  const r = round.toLowerCase();
-  if (r.includes("group")) return "group";
-  if (r.includes("round of 32")) return "r32";
-  if (r.includes("round of 16")) return "r16";
-  if (r.includes("quarter")) return "qf";
-  if (r.includes("semi")) return "sf";
-  if (r.includes("3rd place") || r.includes("third")) return "third";
-  if (r.includes("final")) return "final";
-  return null;
-}
-
-// Normalize a team name for fuzzy matching: strip accents, lowercase, drop non-alphanumerics.
 function norm(s: string): string {
   return s
     .normalize("NFD")
@@ -69,53 +52,32 @@ function norm(s: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-// Known API-Football vs our-seed naming differences (normalized → normalized).
-const NAME_ALIASES: Record<string, string> = {
-  usa: "unitedstates",
-  turkey: "turkiye",
-  czechrepublic: "czechia",
-  bosniaandherzegovina: "bosniaherzegovina",
-  congodr: "drcongo",
-  drcongo: "drcongo",
-  koreasouth: "southkorea",
-  iriran: "iran",
-};
-
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   if (req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  if (new URL(req.url).searchParams.get("secret") === secret) return true;
-  return false;
+  return new URL(req.url).searchParams.get("secret") === secret;
 }
 
 export async function GET(req: NextRequest) {
   if (!authorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  const apiKey = process.env.API_FOOTBALL_KEY;
+  const apiKey = process.env.FOOTBALL_DATA_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, error: "API_FOOTBALL_KEY is not set" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "FOOTBALL_DATA_KEY is not set" }, { status: 500 });
   }
 
-  // 1. Fetch the full World Cup 2026 fixture list (with results).
-  const res = await fetch(`${API_BASE}/fixtures?league=${WORLD_CUP_LEAGUE}&season=${SEASON}`, {
-    headers: { "x-apisports-key": apiKey },
-    cache: "no-store",
-  });
+  const res = await fetch(API, { headers: { "X-Auth-Token": apiKey }, cache: "no-store" });
   if (!res.ok) {
-    return NextResponse.json(
-      { ok: false, error: `API-Football returned ${res.status}` },
-      { status: 502 }
-    );
+    return NextResponse.json({ ok: false, error: `football-data.org ${res.status}` }, { status: 502 });
   }
-  const json = (await res.json()) as ApiResponse;
-  const fixtures = json.response ?? [];
+  const json = (await res.json()) as FdResponse;
+  const apiMatches = json.matches ?? [];
+  if (apiMatches.length === 0) {
+    return NextResponse.json({ ok: false, error: json.message ?? "no matches returned" }, { status: 502 });
+  }
 
-  // 2. Load our teams + matches.
   const admin = createAdminClient();
   const [{ data: teamsData }, { data: matchesData }] = await Promise.all([
     admin.from("teams").select("*"),
@@ -124,128 +86,149 @@ export async function GET(req: NextRequest) {
   const teams = (teamsData ?? []) as Team[];
   const matches = (matchesData ?? []) as Match[];
 
-  // Resolver: normalized team name / code → our team id.
+  // Resolve an API team to our team id, by 3-letter code (tla) or normalized name.
   const byKey = new Map<string, number>();
   for (const t of teams) {
-    byKey.set(norm(t.name), t.id);
     if (t.code) byKey.set(norm(t.code), t.id);
+    byKey.set(norm(t.name), t.id);
   }
-  const resolveTeam = (apiName: string): number | null => {
-    const n = norm(apiName);
-    if (byKey.has(n)) return byKey.get(n)!;
-    const alias = NAME_ALIASES[n];
-    if (alias && byKey.has(alias)) return byKey.get(alias)!;
+  const resolve = (t: FdTeam | undefined): number | null => {
+    if (!t) return null;
+    if (t.tla && byKey.has(norm(t.tla))) return byKey.get(norm(t.tla))!;
+    if (t.name && byKey.has(norm(t.name))) return byKey.get(norm(t.name))!;
     return null;
   };
 
-  // Index our matches by stage + unordered team pair (a match has a unique pair per stage).
+  // Index our matches: group games by unordered team pair; everything by stage (ordered).
   const pairKey = (stage: string, a: number, b: number) =>
     `${stage}|${Math.min(a, b)}-${Math.max(a, b)}`;
-  const matchByPair = new Map<string, Match>();
+  const ourByPair = new Map<string, Match>();
+  const ourByStage = new Map<string, Match[]>();
   for (const m of matches) {
     if (m.home_team_id && m.away_team_id) {
-      matchByPair.set(pairKey(m.stage, m.home_team_id, m.away_team_id), m);
+      ourByPair.set(pairKey(m.stage, m.home_team_id, m.away_team_id), m);
     }
+    (ourByStage.get(m.stage) ?? ourByStage.set(m.stage, []).get(m.stage)!).push(m);
+  }
+  for (const arr of ourByStage.values()) {
+    arr.sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at) || a.id - b.id);
+  }
+  // API knockout matches grouped by stage, chronological (for order-based mapping pre-draw).
+  const apiByStage = new Map<MatchStage, FdMatch[]>();
+  for (const fx of apiMatches) {
+    const st = STAGE_MAP[fx.stage];
+    if (!st) continue;
+    (apiByStage.get(st) ?? apiByStage.set(st, []).get(st)!).push(fx);
+  }
+  for (const arr of apiByStage.values()) {
+    arr.sort((a, b) => a.utcDate.localeCompare(b.utcDate) || a.id - b.id);
   }
 
-  const report: SyncReport = {
-    applied: [],
-    unchanged: [],
-    unresolvedTeams: [],
-    unmatchedFixtures: [],
-    notFinished: 0,
+  const report = {
+    timeUpdates: 0,
+    teamsSet: 0,
+    applied: [] as number[],
+    unresolved: new Set<string>(),
+    unmatched: [] as string[],
   };
 
-  for (const fx of fixtures) {
-    if (!FINISHED.has(fx.fixture?.status?.short)) {
-      report.notFinished++;
-      continue;
+  async function applyMatch(our: Match, fx: FdMatch, homeId: number | null, awayId: number | null) {
+    const teamsKnown = homeId != null && awayId != null;
+    const updates: Record<string, unknown> = {};
+
+    if (new Date(our.kickoff_at).getTime() !== new Date(fx.utcDate).getTime()) {
+      updates.kickoff_at = fx.utcDate;
     }
-    const stage = roundToStage(fx.league?.round ?? "");
-    const homeName = fx.teams?.home?.name ?? "";
-    const awayName = fx.teams?.away?.name ?? "";
-    const homeId = resolveTeam(homeName);
-    const awayId = resolveTeam(awayName);
-
-    if (!homeId) report.unresolvedTeams.push(homeName);
-    if (!awayId) report.unresolvedTeams.push(awayName);
-    if (!stage || !homeId || !awayId) continue;
-
-    const ourMatch = matchByPair.get(pairKey(stage, homeId, awayId));
-    if (!ourMatch) {
-      report.unmatchedFixtures.push(`${homeName} v ${awayName} (${stage})`);
-      continue;
+    if (teamsKnown && (our.home_team_id == null || our.away_team_id == null)) {
+      updates.home_team_id = homeId;
+      updates.away_team_id = awayId;
+      report.teamsSet++;
     }
 
-    // 90' score (fall back to final goals). API order is API-home/away.
-    const apiHome = fx.score?.fulltime?.home ?? fx.goals?.home;
-    const apiAway = fx.score?.fulltime?.away ?? fx.goals?.away;
-    if (apiHome == null || apiAway == null) {
-      report.unmatchedFixtures.push(`${homeName} v ${awayName} (no score)`);
-      continue;
+    const ft = fx.score.fullTime;
+    const finished = FINISHED.has(fx.status) && ft.home != null && ft.away != null && teamsKnown;
+    let needRescore = false;
+    if (finished) {
+      const ourHomeId = (updates.home_team_id as number | undefined) ?? our.home_team_id;
+      const sameOrder = ourHomeId === homeId;
+      const oh = sameOrder ? ft.home : ft.away;
+      const oa = sameOrder ? ft.away : ft.home;
+      const winnerId =
+        our.stage === "group"
+          ? null
+          : fx.score.winner === "HOME_TEAM"
+            ? homeId
+            : fx.score.winner === "AWAY_TEAM"
+              ? awayId
+              : null;
+      if (
+        our.status !== "final" ||
+        our.home_score !== oh ||
+        our.away_score !== oa ||
+        our.winner_team_id !== winnerId
+      ) {
+        updates.home_score = oh;
+        updates.away_score = oa;
+        updates.winner_team_id = winnerId;
+        updates.status = "final";
+        needRescore = true;
+      }
     }
 
-    // Our match may store the teams in the opposite order — align to our home_team_id.
-    const sameOrder = ourMatch.home_team_id === homeId;
-    const ourHome = sameOrder ? apiHome : apiAway;
-    const ourAway = sameOrder ? apiAway : apiHome;
+    if (Object.keys(updates).length === 0) return;
+    if (updates.kickoff_at) report.timeUpdates++;
 
-    // Advancer (knockout only): API marks the winner team.
-    let winnerTeamId: number | null = null;
-    if (stage !== "group") {
-      if (fx.teams.home.winner === true) winnerTeamId = homeId;
-      else if (fx.teams.away.winner === true) winnerTeamId = awayId;
-    }
-
-    // Idempotent: skip if already final with identical score + advancer.
-    if (
-      ourMatch.status === "final" &&
-      ourMatch.home_score === ourHome &&
-      ourMatch.away_score === ourAway &&
-      ourMatch.winner_team_id === winnerTeamId
-    ) {
-      report.unchanged.push(ourMatch.id);
-      continue;
-    }
-
-    // Apply the result, then re-score every prediction for this match.
-    const { data: updated, error: upErr } = await admin
+    const { data: updated } = await admin
       .from("matches")
-      .update({
-        home_score: ourHome,
-        away_score: ourAway,
-        winner_team_id: winnerTeamId,
-        status: "final",
-      })
-      .eq("id", ourMatch.id)
+      .update(updates)
+      .eq("id", our.id)
       .select("*")
       .single();
-    if (upErr || !updated) {
-      report.unmatchedFixtures.push(`${homeName} v ${awayName} (update failed)`);
-      continue;
-    }
+    if (!updated) return;
 
-    const { data: preds } = await admin
-      .from("predictions")
-      .select("*")
-      .eq("match_id", ourMatch.id);
-    for (const p of (preds ?? []) as Prediction[]) {
-      const pts = scorePrediction(p, updated as Match);
-      await admin.from("predictions").update({ points_awarded: pts, scored: true }).eq("id", p.id);
+    if (needRescore) {
+      report.applied.push(our.id);
+      const { data: preds } = await admin.from("predictions").select("*").eq("match_id", our.id);
+      for (const p of (preds ?? []) as Prediction[]) {
+        const pts = scorePrediction(p, updated as Match);
+        await admin.from("predictions").update({ points_awarded: pts, scored: true }).eq("id", p.id);
+      }
     }
-
-    report.applied.push({
-      id: ourMatch.id,
-      teams: `${homeName} v ${awayName}`,
-      score: `${ourHome}–${ourAway}`,
-    });
   }
 
-  report.unresolvedTeams = [...new Set(report.unresolvedTeams)];
+  // Group games: match by group + team pair.
+  for (const fx of apiMatches) {
+    if (STAGE_MAP[fx.stage] !== "group") continue;
+    const homeId = resolve(fx.homeTeam);
+    const awayId = resolve(fx.awayTeam);
+    if (homeId == null) report.unresolved.add(fx.homeTeam?.name ?? "?");
+    if (awayId == null) report.unresolved.add(fx.awayTeam?.name ?? "?");
+    if (homeId == null || awayId == null) continue;
+    const our = ourByPair.get(pairKey("group", homeId, awayId));
+    if (!our) {
+      report.unmatched.push(`${fx.homeTeam.name} v ${fx.awayTeam.name}`);
+      continue;
+    }
+    await applyMatch(our, fx, homeId, awayId);
+  }
+
+  // Knockout: map by chronological order within each stage (teams fill in as they're drawn).
+  for (const [stage, apiArr] of apiByStage) {
+    if (stage === "group") continue;
+    const ourArr = ourByStage.get(stage) ?? [];
+    for (let i = 0; i < Math.min(ourArr.length, apiArr.length); i++) {
+      const fx = apiArr[i];
+      await applyMatch(ourArr[i], fx, resolve(fx.homeTeam), resolve(fx.awayTeam));
+    }
+  }
 
   return NextResponse.json({
     ok: true,
     appliedCount: report.applied.length,
-    ...report,
+    timeUpdates: report.timeUpdates,
+    teamsSet: report.teamsSet,
+    applied: report.applied,
+    unresolvedTeams: [...report.unresolved],
+    unmatched: report.unmatched,
   });
 }
