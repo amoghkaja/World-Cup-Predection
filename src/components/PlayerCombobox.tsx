@@ -68,7 +68,7 @@ export function PlayerCombobox({
   }
 
   return (
-    <div style={{ position: "relative" }}>
+    <div>
       <input
         className="input"
         placeholder={placeholder}
@@ -84,17 +84,12 @@ export function PlayerCombobox({
         <div
           className="scroll"
           style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: "calc(100% + 4px)",
-            zIndex: 20,
-            maxHeight: 240,
+            marginTop: 4,
+            maxHeight: 220,
             overflowY: "auto",
             background: "var(--surface)",
             border: "1px solid var(--line)",
             borderRadius: 12,
-            boxShadow: "var(--shadow-md)",
           }}
         >
           {results.map((p) => (
