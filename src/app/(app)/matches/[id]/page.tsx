@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMatch, getMyPredictions, getSetupStatus } from "@/lib/queries";
-import { isLocked, formatKickoff } from "@/lib/format";
+import { isLocked } from "@/lib/format";
+import { LocalTime } from "@/components/LocalTime";
 import { OUTCOME_POINTS, EXACT_BONUS, maxPointsForStage } from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -95,7 +96,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           className="t-sm text-center"
           style={{ color: "var(--text-3)", paddingBottom: 18 }}
         >
-          {formatKickoff(match.kickoff_at)}
+          <LocalTime iso={match.kickoff_at} />
           {match.label ? ` · ${match.label}` : ""}
         </div>
 

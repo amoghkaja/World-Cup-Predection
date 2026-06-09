@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { MatchWithTeams, Team } from "@/lib/types";
 import { saveMatchResult, setMatchTeams } from "@/app/actions";
-import { formatKickoff } from "@/lib/format";
+import { LocalTime } from "./LocalTime";
 import { TeamBadge } from "./TeamBadge";
 import { ScoreStepper } from "./ScoreStepper";
 import { StatusPill } from "./StatusPill";
@@ -54,7 +54,9 @@ export function AdminMatchRow({ match, teams }: { match: MatchWithTeams; teams: 
         <span style={{ fontWeight: 700 }}>
           #{match.id} · {match.label}
         </span>
-        <span>{formatKickoff(match.kickoff_at)}</span>
+        <span>
+          <LocalTime iso={match.kickoff_at} />
+        </span>
       </div>
 
       {isKnockout && !teamsKnown ? (

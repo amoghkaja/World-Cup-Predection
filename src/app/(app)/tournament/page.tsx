@@ -6,8 +6,9 @@ import {
   podiumWindows,
   tournamentLockAt,
 } from "@/lib/queries";
-import { isLocked, formatKickoff } from "@/lib/format";
+import { isLocked } from "@/lib/format";
 import { Countdown } from "@/components/Countdown";
+import { LocalTime } from "@/components/LocalTime";
 import { TournamentPicker, type PodiumWindowState } from "@/components/TournamentPicker";
 
 export const dynamic = "force-dynamic";
@@ -96,14 +97,17 @@ export default async function TournamentPage() {
           </p>
           {lockAt && (
             <>
-              <div
-                className="inline-flex"
-                style={{ padding: "14px 20px", borderRadius: 18, background: "rgba(0,0,0,0.16)" }}
-              >
-                <Countdown kickoff={lockAt} variant="big" />
+              <div className="flex justify-center">
+                <div
+                  className="inline-flex"
+                  style={{ padding: "14px 20px", borderRadius: 18, background: "rgba(0,0,0,0.16)" }}
+                >
+                  <Countdown kickoff={lockAt} variant="big" />
+                </div>
               </div>
               <div className="t-xs" style={{ opacity: 0.8, marginTop: 12 }}>
-                {locked ? "Picks are locked" : "Locks at first kickoff"} · {formatKickoff(lockAt)}
+                {locked ? "Picks are locked" : "Locks at first kickoff"} ·{" "}
+                <LocalTime iso={lockAt} />
               </div>
             </>
           )}

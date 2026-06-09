@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import type { MatchWithTeams, Prediction } from "@/lib/types";
 import { STAGE_LABELS } from "@/lib/types";
-import { formatKickoff, isLocked } from "@/lib/format";
+import { isLocked } from "@/lib/format";
 import { scorePrediction } from "@/lib/scoring";
 import { Icon } from "./Icon";
+import { LocalTime } from "./LocalTime";
 import { Flag } from "./TeamBadge";
 import { Countdown } from "./Countdown";
 import { StatusPill } from "./StatusPill";
@@ -72,7 +73,7 @@ export function MatchCard({
           className="t-xs"
           style={{ color: "var(--text-3)", fontWeight: 700, letterSpacing: ".03em" }}
         >
-          {label} · {formatKickoff(match.kickoff_at)}
+          {label} · <LocalTime iso={match.kickoff_at} />
         </span>
         <StatusPill status={status} predicted={!!prediction} />
       </div>
