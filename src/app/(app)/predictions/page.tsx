@@ -1,79 +1,167 @@
 import Link from "next/link";
 import { getMatches, getMyPredictions } from "@/lib/queries";
-import { STAGE_LABELS } from "@/lib/types";
-import { formatKickoff } from "@/lib/format";
-import { timeTier } from "@/lib/scoring";
+import type { MatchWithTeams, Prediction } from "@/lib/types";
+import { Icon } from "@/components/Icon";
+import { CompactPredictionRow } from "@/components/CompactPredictionRow";
 
 export const dynamic = "force-dynamic";
 
-export default async function PredictionsPage() {
-  const [matches, preds] = await Promise.all([getMatches(), getMyPredictions()]);
-  const rows = matches
-    .filter((m) => preds.has(m.id))
-    .map((m) => ({ match: m, pred: preds.get(m.id)! }));
+type Tab = "all" | "settled" | "pending";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "settled", label: "Settled" },
+  { key: "pending", label: "Pending" },
+];
 
-  const total = rows.reduce((s, r) => s + r.pred.points_awarded, 0);
+function isSettled(m: MatchWithTeams): boolean {
+  return m.status === "final" && m.home_score != null && m.away_score != null;
+}
+
+// Stable day key (UTC date) used for grouping + sorting newest-first.
+function dayKey(iso: string): string {
+  return new Date(iso).toISOString().slice(0, 10);
+}
+function dayLabel(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export default async function PredictionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab: tabParam } = await searchParams;
+  const tab: Tab = tabParam === "settled" || tabParam === "pending" ? tabParam : "all";
+
+  const [matches, preds] = await Promise.all([getMatches(), getMyPredictions()]);
+
+  const mine = matches
+    .filter((m) => preds.has(m.id))
+    .map((m) => ({ match: m, pred: preds.get(m.id)! }))
+    .sort((a, b) => b.match.kickoff_at.localeCompare(a.match.kickoff_at));
+
+  const settled = mine.filter(({ match }) => isSettled(match));
+  const earned = settled.reduce((s, { pred }) => s + pred.points_awarded, 0);
+  const hits = settled.filter(({ pred }) => pred.points_awarded > 0).length;
+  const pendingCount = mine.length - settled.length;
+
+  const list = mine.filter(({ match }) => {
+    if (tab === "settled") return isSettled(match);
+    if (tab === "pending") return !isSettled(match);
+    return true;
+  });
+
+  // Group by day, newest day first.
+  const dayMap = new Map<string, { match: MatchWithTeams; pred: Prediction }[]>();
+  for (const item of list) {
+    const k = dayKey(item.match.kickoff_at);
+    (dayMap.get(k) ?? dayMap.set(k, []).get(k)!).push(item);
+  }
+  const days = [...dayMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  const summary: { label: string; value: string | number; icon: string; gold?: boolean }[] = [
+    { label: "Points banked", value: earned, icon: "bolt", gold: true },
+    { label: "Correct results", value: `${hits}/${settled.length}`, icon: "target" },
+    { label: "Pending picks", value: pendingCount, icon: "clock" },
+  ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold">My predictions</h1>
-        <span className="chip" style={{ color: "var(--accent)" }}>
-          {total} pts from matches
-        </span>
+    <div className="flex flex-col">
+      <div className="mb-3">
+        <h1 className="t-h1">My Predictions</h1>
+        <p className="t-sm" style={{ color: "var(--text-3)", marginTop: 3 }}>
+          Your full pick history, points earned, and pending calls.
+        </p>
       </div>
 
-      {rows.length === 0 && (
-        <p className="text-[var(--muted)]">
-          You haven&apos;t predicted anything yet. <Link href="/dashboard" className="underline">Start picking →</Link>
-        </p>
+      {/* summary cards */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        {summary.map((s) => (
+          <div key={s.label} className="card" style={{ padding: "14px 16px" }}>
+            <div
+              className="flex items-center gap-2 mb-2"
+              style={{ color: s.gold ? "var(--gold-strong)" : "var(--text-3)" }}
+            >
+              <Icon name={s.icon} size={16} />
+              <span className="t-label">{s.label}</span>
+            </div>
+            <div
+              className="tnum"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 800,
+                fontSize: 28,
+                color: s.gold ? "var(--gold-strong)" : "var(--text)",
+              }}
+            >
+              {s.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* filter (server-rendered segmented via query param) */}
+      <div className="seg mb-4 self-start">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={t.key === "all" ? "/predictions" : `/predictions?tab=${t.key}`}
+            className={`seg-btn ${tab === t.key ? "on" : ""}`}
+            scroll={false}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
+      {days.length === 0 && (
+        <div
+          className="card flex flex-col items-center text-center gap-2"
+          style={{ padding: "40px 20px" }}
+        >
+          <div
+            className="grid place-items-center"
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: "var(--surface-2)",
+              color: "var(--text-3)",
+            }}
+          >
+            <Icon name="list" size={24} />
+          </div>
+          <div className="t-h3">No predictions yet</div>
+          <p className="t-sm" style={{ color: "var(--text-3)", maxWidth: 320 }}>
+            Head to the dashboard and lock in your first calls before kickoff.
+          </p>
+          <Link href="/dashboard" className="btn btn-primary mt-1" style={{ padding: "10px 18px" }}>
+            Go to dashboard
+          </Link>
+        </div>
       )}
 
-      <div className="flex flex-col gap-2">
-        {rows.map(({ match, pred }) => {
-          const tier = timeTier(pred.submitted_at, match.kickoff_at);
-          const correct = pred.scored && pred.points_awarded > 0;
-          return (
-            <Link
-              key={match.id}
-              href={`/matches/${match.id}`}
-              className="card p-3 flex items-center justify-between gap-3 hover:border-[var(--primary)]"
-            >
-              <div className="min-w-0">
-                <div className="text-xs text-[var(--accent)]">
-                  {STAGE_LABELS[match.stage]}
-                  {match.group_label ? ` · Group ${match.group_label}` : ""}
-                </div>
-                <div className="font-semibold truncate">
-                  {match.home_team?.flag_emoji} {match.home_team?.code ?? "?"}{" "}
-                  <span className="text-[var(--muted)]">
-                    {pred.pred_home_score}–{pred.pred_away_score}
-                  </span>{" "}
-                  {match.away_team?.code ?? "?"} {match.away_team?.flag_emoji}
-                </div>
-                <div className="text-xs text-[var(--muted)]">{formatKickoff(match.kickoff_at)}</div>
-              </div>
-              <div className="text-right shrink-0">
-                {match.status === "final" ? (
-                  <div className="text-sm">
-                    {match.home_score}–{match.away_score}{" "}
-                    <span style={{ color: correct ? "var(--primary)" : "var(--danger)" }}>
-                      {correct ? "✓" : "✗"}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="chip">×{tier.multiplier}</div>
-                )}
-                {pred.scored && (
-                  <div className="text-sm font-bold" style={{ color: "var(--accent)" }}>
-                    {pred.points_awarded} pts
-                  </div>
-                )}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+      {days.map(([k, items]) => (
+        <div key={k} className="mb-[18px]">
+          <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
+            {dayLabel(items[0].match.kickoff_at)}
+          </div>
+          <div className="card" style={{ overflow: "hidden" }}>
+            {items.map((item, i) => (
+              <CompactPredictionRow
+                key={item.match.id}
+                match={item.match}
+                pred={item.pred}
+                last={i === items.length - 1}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/queries";
-import type { LeaderboardRow } from "@/lib/types";
+import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
+import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icon";
+import { LeaderboardRow } from "@/components/LeaderboardRow";
 
 export const dynamic = "force-dynamic";
 
@@ -10,52 +13,142 @@ export default async function LeaderboardPage() {
     supabase.from("leaderboard").select("*").order("total_points", { ascending: false }),
     getCurrentUser(),
   ]);
-  const rows = (data ?? []) as LeaderboardRow[];
+  const rows = (data ?? []) as LeaderboardRowData[];
+  const me = (r: LeaderboardRowData) => r.user_id === user?.id;
 
-  const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`);
+  const podium = rows.slice(0, 3);
+  const rest = rows.slice(3);
+  // Display order: 2nd, 1st, 3rd.
+  const podiumOrder = [
+    { row: podium[1], place: 2 },
+    { row: podium[0], place: 1 },
+    { row: podium[2], place: 3 },
+  ].filter((p) => p.row);
+
+  const firstName = (r: LeaderboardRowData) => (r.display_name ?? "Player").split(" ")[0];
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-extrabold">Leaderboard</h1>
+    <div className="mx-auto w-full" style={{ maxWidth: 760 }}>
+      <div className="mb-3">
+        <h1 className="t-h1">Leaderboard</h1>
+        <p className="t-sm" style={{ color: "var(--text-3)", marginTop: 3 }}>
+          Friends league · {rows.length} {rows.length === 1 ? "player" : "players"}
+        </p>
+      </div>
 
-      {rows.length === 0 && <p className="text-[var(--muted)]">No players yet.</p>}
+      {rows.length === 0 && (
+        <div className="card" style={{ padding: "32px 20px", textAlign: "center" }}>
+          <p className="t-sm" style={{ color: "var(--text-3)" }}>
+            No players on the board yet.
+          </p>
+        </div>
+      )}
 
-      <div className="flex flex-col gap-1">
-        {rows.map((r, i) => {
-          const me = r.user_id === user?.id;
-          const acc =
-            r.total_match_preds > 0
-              ? Math.round((r.correct_matches / r.total_match_preds) * 100)
-              : null;
-          return (
-            <div
-              key={r.user_id}
-              className="card p-3 flex items-center gap-3"
-              style={me ? { borderColor: "var(--primary)" } : undefined}
-            >
-              <span className="w-8 text-center text-lg font-bold tabular-nums">{medal(i)}</span>
-              {r.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.avatar_url} alt="" className="w-9 h-9 rounded-full" />
-              ) : (
-                <span className="w-9 h-9 rounded-full bg-[var(--surface-2)] grid place-items-center">
-                  {(r.display_name ?? "?").charAt(0).toUpperCase()}
-                </span>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate">
-                  {r.display_name ?? "Anonymous"} {me && <span className="text-[var(--muted)] text-xs">(you)</span>}
+      {/* podium */}
+      {podiumOrder.length > 0 && (
+        <div className="grid grid-cols-3 gap-2.5 items-end mb-[18px]">
+          {podiumOrder.map(({ row, place }, i) => {
+            const h = place === 1 ? 132 : place === 2 ? 104 : 88;
+            const medal =
+              place === 1
+                ? "var(--gold)"
+                : place === 2
+                  ? "oklch(0.78 0.01 250)"
+                  : "oklch(0.66 0.09 50)";
+            return (
+              <div
+                key={row.user_id}
+                className="anim-up flex flex-col items-center"
+                style={{ animationDelay: `${i * 0.08}s` }}
+              >
+                <div className="relative mb-2.5">
+                  <Avatar
+                    name={row.display_name ?? "?"}
+                    src={row.avatar_url}
+                    size={place === 1 ? 64 : 52}
+                    ring={place === 1 ? "var(--gold)" : undefined}
+                  />
+                  <span
+                    className="grid place-items-center"
+                    style={{
+                      position: "absolute",
+                      bottom: -6,
+                      right: -6,
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      background: medal,
+                      color: "#3a2c00",
+                      fontWeight: 800,
+                      fontSize: 12,
+                      fontFamily: "var(--font-display)",
+                      border: "2px solid var(--surface)",
+                    }}
+                  >
+                    {place}
+                  </span>
                 </div>
-                {acc !== null && (
-                  <div className="text-xs text-[var(--muted)]">{acc}% accuracy · {r.correct_matches} correct</div>
-                )}
+                <div
+                  className="truncate text-center"
+                  style={{ fontWeight: 800, fontSize: 14, maxWidth: 110 }}
+                >
+                  {me(row) ? "You" : firstName(row)}
+                </div>
+                <div
+                  className="tnum"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 800,
+                    fontSize: 20,
+                    color: "var(--gold-strong)",
+                  }}
+                >
+                  {row.total_points}
+                </div>
+                <div
+                  className="grid w-full mt-2"
+                  style={{
+                    height: h,
+                    borderRadius: "14px 14px 0 0",
+                    background: place === 1 ? "var(--brand)" : "var(--surface-2)",
+                    border: "1px solid var(--line)",
+                    borderBottom: "none",
+                    placeItems: "start center",
+                    paddingTop: 12,
+                  }}
+                >
+                  <Icon
+                    name={place === 1 ? "trophy" : "medal"}
+                    size={place === 1 ? 26 : 20}
+                    style={{ color: place === 1 ? "var(--gold)" : "var(--text-3)" }}
+                  />
+                </div>
               </div>
-              <span className="text-xl font-extrabold" style={{ color: "var(--accent)" }}>
-                {r.total_points}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+      )}
+
+      {/* full list */}
+      {rest.length > 0 && (
+        <div className="card" style={{ overflow: "hidden", padding: 6 }}>
+          {rest.map((r, i) => (
+            <LeaderboardRow
+              key={r.user_id}
+              row={r}
+              rank={i + 4}
+              me={me(r)}
+              last={i === rest.length - 1}
+            />
+          ))}
+        </div>
+      )}
+
+      <div
+        className="t-xs text-center"
+        style={{ color: "var(--text-3)", marginTop: 14 }}
+      >
+        Updated live as results come in · Accuracy = correct outcomes ÷ settled picks
       </div>
     </div>
   );

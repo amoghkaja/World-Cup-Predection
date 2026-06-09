@@ -3,73 +3,67 @@
 import { useState, useTransition } from "react";
 import type { MatchWithTeams, PredOutcome, Prediction } from "@/lib/types";
 import { savePrediction } from "@/app/actions";
-import { timeTier, maxPointsForStage } from "@/lib/scoring";
-import { TeamBadge } from "./TeamBadge";
+import { Icon } from "./Icon";
+import { Flag } from "./TeamBadge";
+import { ScoreStepper } from "./ScoreStepper";
+import { OutcomeToggle, type Outcome } from "./OutcomeToggle";
 
-function Stepper({
-  value,
-  onChange,
-  disabled,
-  label,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-xs text-[var(--muted)] sr-only">{label}</span>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-label={`decrease ${label}`}
-          className="btn btn-ghost w-8 h-8 !p-0 text-lg"
-          disabled={disabled || value <= 0}
-          onClick={() => onChange(Math.max(0, value - 1))}
-        >
-          −
-        </button>
-        <span className="w-8 text-center text-2xl font-bold tabular-nums">{value}</span>
-        <button
-          type="button"
-          aria-label={`increase ${label}`}
-          className="btn btn-ghost w-8 h-8 !p-0 text-lg"
-          disabled={disabled || value >= 20}
-          onClick={() => onChange(Math.min(20, value + 1))}
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
+// outcome <-> toggle code mappings (db uses home/away/draw, toggle uses H/A/D)
+const toToggle = (o: PredOutcome): Outcome => (o === "home" ? "H" : o === "away" ? "A" : "D");
 
 export function PredictionForm({
   match,
   existing,
   locked,
+  compact,
+  onSaved,
 }: {
   match: MatchWithTeams;
   existing: Prediction | null;
   locked: boolean;
+  /** drawer (true) vs full match-detail surface (false) */
+  compact?: boolean;
+  /** fired after a successful save (e.g. to collapse a drawer) */
+  onSaved?: () => void;
 }) {
   const teamsKnown = !!match.home_team && !!match.away_team;
   const isKnockout = match.stage !== "group";
 
-  const [home, setHome] = useState(existing?.pred_home_score ?? 0);
-  const [away, setAway] = useState(existing?.pred_away_score ?? 0);
-  // advancer is only meaningful for knockout draws
+  const [home, setHome] = useState(existing?.pred_home_score ?? 1);
+  const [away, setAway] = useState(existing?.pred_away_score ?? 1);
+  // advancer only matters when a knockout pick is level
   const [advancer, setAdvancer] = useState<PredOutcome>(
     existing?.pred_outcome === "away" ? "away" : "home"
   );
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // derive outcome from the scoreline; knockout draws keep an advancer choice
   const outcome: PredOutcome =
     home > away ? "home" : away > home ? "away" : isKnockout ? advancer : "draw";
 
   const disabled = locked || !teamsKnown;
+  const toggleVal: Outcome = isKnockout && home === away ? toToggle(advancer) : toToggle(outcome);
+
+  function setOutcomeFromToggle(v: Outcome) {
+    // tapping the toggle nudges the scoreline to match the chosen outcome
+    if (v === "H") {
+      if (!(home > away)) {
+        setHome(1);
+        setAway(0);
+      }
+    } else if (v === "A") {
+      if (!(away > home)) {
+        setHome(0);
+        setAway(1);
+      }
+    } else {
+      // draw — level the score; for knockouts also record the advancer
+      const lvl = Math.max(0, Math.min(home, away));
+      setHome(lvl);
+      setAway(lvl);
+    }
+  }
 
   function submit() {
     setMsg(null);
@@ -80,98 +74,151 @@ export function PredictionForm({
         homeScore: home,
         awayScore: away,
       });
-      setMsg(
-        res.ok
-          ? { ok: true, text: "Prediction saved!" }
-          : { ok: false, text: res.error }
-      );
+      if (res.ok) {
+        setMsg({ ok: true, text: "Prediction saved" });
+        onSaved?.();
+      } else {
+        setMsg({ ok: false, text: res.error });
+      }
     });
   }
 
-  const tier = existing ? timeTier(existing.submitted_at, match.kickoff_at) : null;
-
   if (!teamsKnown) {
     return (
-      <p className="text-sm text-[var(--muted)] italic">
+      <p className="t-sm" style={{ color: "var(--text-3)", fontStyle: "italic" }}>
         Teams not set yet — you can predict once the bracket fills in.
       </p>
     );
   }
 
+  const homeCode = match.home_team?.code ?? "HOME";
+  const awayCode = match.away_team?.code ?? "AWAY";
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-center gap-4">
-        <div className="flex flex-col items-center gap-2">
-          <TeamBadge team={match.home_team} />
-          <Stepper value={home} onChange={setHome} disabled={disabled} label="home score" />
+    <div className="flex flex-col" style={{ gap: 14 }}>
+      <OutcomeToggle
+        value={toggleVal}
+        disabled={disabled}
+        onChange={setOutcomeFromToggle}
+        home={match.home_team?.name ?? homeCode}
+        away={match.away_team?.name ?? awayCode}
+      />
+
+      <div
+        className="flex items-center justify-center"
+        style={{ gap: compact ? 18 : 22, marginTop: compact ? 2 : 6 }}
+      >
+        <div className="text-center">
+          {!compact && <Flag flag={match.home_team?.flag_emoji} name={match.home_team?.name} />}
+          <div
+            className="t-xs"
+            style={{ color: "var(--text-3)", margin: compact ? "0 0 6px" : "6px 0 8px", fontWeight: 700 }}
+          >
+            {homeCode}
+          </div>
+          <ScoreStepper
+            value={home}
+            disabled={disabled}
+            accent="var(--brand)"
+            onChange={setHome}
+          />
         </div>
-        <span className="text-[var(--muted)] font-bold">vs</span>
-        <div className="flex flex-col items-center gap-2">
-          <TeamBadge team={match.away_team} align="right" />
-          <Stepper value={away} onChange={setAway} disabled={disabled} label="away score" />
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 800,
+            fontSize: compact ? 22 : 26,
+            color: "var(--line-strong)",
+            marginTop: compact ? 18 : 20,
+          }}
+        >
+          :
+        </span>
+        <div className="text-center">
+          {!compact && <Flag flag={match.away_team?.flag_emoji} name={match.away_team?.name} />}
+          <div
+            className="t-xs"
+            style={{ color: "var(--text-3)", margin: compact ? "0 0 6px" : "6px 0 8px", fontWeight: 700 }}
+          >
+            {awayCode}
+          </div>
+          <ScoreStepper
+            value={away}
+            disabled={disabled}
+            accent="var(--brand)"
+            onChange={setAway}
+          />
         </div>
       </div>
 
-      {isKnockout && home === away && (
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-xs text-[var(--muted)]">Who advances (after extra time / pens)?</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`btn ${advancer === "home" ? "btn-primary" : "btn-ghost"} text-sm`}
-              disabled={disabled}
-              onClick={() => setAdvancer("home")}
-            >
-              {match.home_team?.flag_emoji} {match.home_team?.code}
-            </button>
-            <button
-              type="button"
-              className={`btn ${advancer === "away" ? "btn-primary" : "btn-ghost"} text-sm`}
-              disabled={disabled}
-              onClick={() => setAdvancer("away")}
-            >
-              {match.away_team?.flag_emoji} {match.away_team?.code}
-            </button>
+      {isKnockout && home === away && !disabled && (
+        <div className="flex flex-col items-center" style={{ gap: 6 }}>
+          <span className="t-xs" style={{ color: "var(--text-3)" }}>
+            Who advances (after extra time / pens)?
+          </span>
+          <div className="flex" style={{ gap: 8 }}>
+            {(["home", "away"] as const).map((side) => {
+              const team = side === "home" ? match.home_team : match.away_team;
+              const on = advancer === side;
+              return (
+                <button
+                  key={side}
+                  type="button"
+                  className={`btn ${on ? "btn-primary" : "btn-ghost"}`}
+                  style={{ padding: "8px 14px", fontSize: 13.5 }}
+                  onClick={() => setAdvancer(side)}
+                >
+                  {team?.flag_emoji} {team?.code}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 text-xs text-[var(--muted)]">
-        <span>
-          Pick:{" "}
-          <strong className="text-[var(--foreground)]">
-            {outcome === "draw"
-              ? "Draw"
-              : outcome === "home"
-              ? match.home_team?.code
-              : match.away_team?.code}
-          </strong>{" "}
-          {home}–{away}
-        </span>
-        <span>up to {maxPointsForStage(match.stage)} pts</span>
-      </div>
-
       {!locked && (
-        <button className="btn btn-primary" onClick={submit} disabled={isPending || disabled}>
-          {isPending ? "Saving…" : existing ? "Update prediction" : "Save prediction"}
+        <button
+          className="btn btn-primary"
+          style={compact ? { width: "100%" } : { width: "100%", padding: 16, fontSize: 16 }}
+          onClick={submit}
+          disabled={isPending || disabled}
+        >
+          <Icon name="check" size={compact ? 17 : 19} sw={2.6} />
+          {isPending ? "Saving…" : existing ? "Update prediction" : compact ? "Save prediction" : "Lock in prediction"}
         </button>
       )}
 
+      {!locked && (
+        <div
+          className="t-xs flex items-center justify-center"
+          style={{ color: "var(--text-3)", gap: 6 }}
+        >
+          <Icon name="lock" size={12} />
+          Locks the moment the match kicks off
+        </div>
+      )}
+
       {locked && existing && (
-        <p className="text-xs text-center text-[var(--muted)]">
-          🔒 Locked. You predicted <strong>{existing.pred_home_score}–{existing.pred_away_score}</strong>
-          {tier ? ` · ${tier.label} (×${tier.multiplier})` : ""}
+        <p className="t-xs text-center flex items-center justify-center" style={{ color: "var(--text-3)", gap: 6 }}>
+          <Icon name="lock" size={12} />
+          Locked · you predicted{" "}
+          <strong className="tnum" style={{ color: "var(--text-2)" }}>
+            {existing.pred_home_score}–{existing.pred_away_score}
+          </strong>
           {existing.scored ? ` · ${existing.points_awarded} pts` : ""}
         </p>
       )}
       {locked && !existing && (
-        <p className="text-xs text-center text-[var(--danger)]">🔒 Locked — no prediction made.</p>
+        <p className="t-xs text-center flex items-center justify-center" style={{ color: "var(--bad)", gap: 6 }}>
+          <Icon name="lock" size={12} />
+          Locked — no prediction made.
+        </p>
       )}
 
       {msg && (
         <p
-          className="text-xs text-center"
-          style={{ color: msg.ok ? "var(--primary)" : "var(--danger)" }}
+          className="t-xs text-center"
+          style={{ color: msg.ok ? "var(--brand-strong)" : "var(--bad)" }}
         >
           {msg.text}
         </p>

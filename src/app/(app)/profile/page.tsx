@@ -1,5 +1,9 @@
+import Link from "next/link";
 import { getProfile } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
+import type { LeaderboardRow } from "@/lib/types";
+import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icon";
 import { ProfileEditor } from "@/components/ProfileEditor";
 
 export const dynamic = "force-dynamic";
@@ -7,42 +11,163 @@ export const dynamic = "force-dynamic";
 export default async function ProfilePage() {
   const profile = await getProfile();
   const supabase = await createClient();
-  const { data: lb } = await supabase
+  const { data } = await supabase
     .from("leaderboard")
-    .select("total_points, correct_matches")
-    .eq("user_id", profile!.id)
-    .maybeSingle();
+    .select("*")
+    .order("total_points", { ascending: false });
+  const board = (data ?? []) as LeaderboardRow[];
+
+  const myIndex = board.findIndex((r) => r.user_id === profile!.id);
+  const my = myIndex >= 0 ? board[myIndex] : null;
+  const rank = myIndex >= 0 ? myIndex + 1 : null;
+  const acc =
+    my && my.total_match_preds > 0
+      ? Math.round((my.correct_matches / my.total_match_preds) * 100)
+      : 0;
+
+  const name = profile?.display_name ?? "You";
+
+  const stats: { label: string; value: string | number; icon: string; gold?: boolean }[] = [
+    { label: "Total points", value: my?.total_points ?? 0, icon: "bolt", gold: true },
+    { label: "League rank", value: rank ? `#${rank}` : "—", icon: "medal" },
+    { label: "Correct picks", value: my?.correct_matches ?? 0, icon: "target" },
+    { label: "Accuracy", value: `${acc}%`, icon: "spark" },
+  ];
+
+  const links: { title: string; sub: string; icon: string; href: string }[] = [
+    { title: "My Predictions", sub: "List of every call you've made", icon: "list", href: "/predictions" },
+    { title: "How scoring works", sub: "Points & bonuses explained", icon: "spark", href: "/scoring" },
+    { title: "Tournament picks", sub: "Champion, finalist & golden boot", icon: "trophy", href: "/tournament" },
+    { title: "Knockout bracket", sub: "Your path to the final", icon: "bracket", href: "/bracket" },
+  ];
 
   return (
-    <div className="flex flex-col gap-4 max-w-md">
-      <h1 className="text-2xl font-extrabold">Profile</h1>
-
-      <div className="card p-5 flex items-center gap-4">
-        {profile?.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.avatar_url} alt="" className="w-16 h-16 rounded-full" />
-        ) : (
-          <span className="w-16 h-16 rounded-full bg-[var(--surface-2)] grid place-items-center text-2xl">
-            {(profile?.display_name ?? "?").charAt(0).toUpperCase()}
-          </span>
-        )}
-        <div>
-          <div className="font-bold text-lg">{profile?.display_name}</div>
-          <div className="text-sm" style={{ color: "var(--accent)" }}>
-            {lb?.total_points ?? 0} pts · {lb?.correct_matches ?? 0} correct
+    <div className="mx-auto w-full" style={{ maxWidth: 640 }}>
+      {/* header card */}
+      <div className="card mb-[18px]" style={{ overflow: "hidden" }}>
+        <div style={{ height: 88, background: "var(--brand-grad)" }} />
+        <div style={{ padding: "0 20px 20px", marginTop: -36 }}>
+          <div className="flex items-end gap-3.5">
+            <Avatar name={name} src={profile?.avatar_url} size={76} ring="var(--surface)" />
+            <div style={{ paddingBottom: 6 }}>
+              <h1 className="t-h1">{name}</h1>
+              <div className="t-sm" style={{ color: "var(--text-3)" }}>
+                {my?.total_points ?? 0} pts
+                {rank ? ` · League rank #${rank}` : ""}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="card p-5">
+      {/* stat grid */}
+      <div className="grid grid-cols-2 gap-3 mb-[18px]">
+        {stats.map((s) => (
+          <div key={s.label} className="card flex items-center gap-3.5" style={{ padding: "16px 18px" }}>
+            <div
+              className="grid place-items-center"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 13,
+                flex: "none",
+                background: s.gold ? "var(--gold-soft)" : "var(--brand-soft)",
+                color: s.gold ? "var(--gold-strong)" : "var(--brand-strong)",
+              }}
+            >
+              <Icon name={s.icon} size={22} />
+            </div>
+            <div>
+              <div
+                className="tnum"
+                style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26 }}
+              >
+                {s.value}
+              </div>
+              <div className="t-xs" style={{ color: "var(--text-3)" }}>
+                {s.label}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* nav links */}
+      <div className="card mb-[18px]" style={{ overflow: "hidden" }}>
+        {links.map((l, i) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="flex items-center gap-3.5"
+            style={{
+              padding: "15px 18px",
+              borderTop: i ? "1px solid var(--line)" : "none",
+            }}
+          >
+            <div
+              className="grid place-items-center"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 11,
+                flex: "none",
+                background: "var(--surface-2)",
+                color: "var(--text-2)",
+              }}
+            >
+              <Icon name={l.icon} size={19} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{l.title}</div>
+              <div className="t-xs" style={{ color: "var(--text-3)" }}>
+                {l.sub}
+              </div>
+            </div>
+            <Icon name="chevR" size={18} style={{ color: "var(--text-3)" }} />
+          </Link>
+        ))}
+      </div>
+
+      {/* edit display name */}
+      <div className="card mb-[18px]" style={{ padding: 18 }}>
+        <div className="flex items-center gap-2 mb-3" style={{ color: "var(--text-2)" }}>
+          <Icon name="edit" size={18} />
+          <span className="t-h3">Edit profile</span>
+        </div>
         <ProfileEditor initialName={profile?.display_name ?? ""} />
       </div>
 
-      <form action="/auth/signout" method="post">
-        <button className="btn btn-ghost w-full" type="submit">
-          Sign out
-        </button>
-      </form>
+      {/* sign out */}
+      <div className="card" style={{ padding: 6 }}>
+        <form action="/auth/signout" method="post">
+          <button
+            type="submit"
+            className="flex items-center gap-3.5 w-full text-left press"
+            style={{ padding: 12, background: "transparent", border: "none", borderRadius: 14 }}
+          >
+            <div
+              className="grid place-items-center"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 11,
+                flex: "none",
+                background: "var(--surface-2)",
+                color: "var(--bad)",
+              }}
+            >
+              <Icon name="logout" size={19} />
+            </div>
+            <div className="flex-1">
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Sign out</div>
+              <div className="t-xs" style={{ color: "var(--text-3)" }}>
+                End your session on this device
+              </div>
+            </div>
+            <Icon name="chevR" size={18} style={{ color: "var(--text-3)" }} />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
