@@ -1,5 +1,6 @@
 import {
   getTeams,
+  getPlayers,
   getMyTournamentPredictions,
   getMyPodiumPredictions,
   podiumWindows,
@@ -52,8 +53,9 @@ function PitchLines() {
 }
 
 export default async function TournamentPage() {
-  const [teams, tourPreds, podium, windows, lockAt] = await Promise.all([
+  const [teams, players, tourPreds, podium, windows, lockAt] = await Promise.all([
     getTeams(),
+    getPlayers(),
     getMyTournamentPredictions(),
     getMyPodiumPredictions(),
     podiumWindows(),
@@ -108,7 +110,13 @@ export default async function TournamentPage() {
         </div>
       </div>
 
-      <TournamentPicker teams={teams} podium={podium} golden={golden} windowState={windowState} />
+      <TournamentPicker
+        teams={teams}
+        players={players}
+        podium={podium}
+        golden={golden}
+        windowState={windowState}
+      />
     </div>
   );
 }

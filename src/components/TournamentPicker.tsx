@@ -6,6 +6,7 @@ import { savePodiumPick, saveTournamentPrediction } from "@/app/actions";
 import { PODIUM_EARLY, PODIUM_LATE, GOLDEN_BOOT_POINTS } from "@/lib/scoring";
 import { Flag } from "./TeamBadge";
 import { Icon } from "./Icon";
+import { PlayerCombobox } from "./PlayerCombobox";
 
 export type PodiumWindowState = "pre" | "group" | "post" | "locked";
 
@@ -24,11 +25,13 @@ const BANNER: Record<PodiumWindowState, string> = {
 
 export function TournamentPicker({
   teams,
+  players,
   podium,
   golden,
   windowState,
 }: {
   teams: Team[];
+  players: { name: string; nationality: string | null }[];
   podium: PodiumPrediction[];
   golden: TournamentPrediction | null;
   windowState: PodiumWindowState;
@@ -250,12 +253,7 @@ export function TournamentPicker({
         </button>
         {open === "boot" && goldenEditable && (
           <div className="anim-up flex flex-col gap-2.5" style={{ padding: "14px 14px 16px", borderTop: "1px solid var(--line)" }}>
-            <input
-              className="input"
-              placeholder="e.g. Kylian Mbappé"
-              value={boot}
-              onChange={(e) => setBoot(e.target.value)}
-            />
+            <PlayerCombobox players={players} value={boot} onSelect={(name) => setBoot(name)} />
             <button type="button" className="btn btn-primary" onClick={saveBoot} disabled={pending}>
               Save Golden Boot
             </button>

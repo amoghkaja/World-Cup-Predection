@@ -45,6 +45,12 @@ export async function getTeams(): Promise<Team[]> {
   return (data ?? []) as Team[];
 }
 
+export async function getPlayers(): Promise<{ name: string; nationality: string | null }[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("players").select("name, nationality").order("name");
+  return (data ?? []) as { name: string; nationality: string | null }[];
+}
+
 export async function getMatches(stage?: string): Promise<MatchWithTeams[]> {
   const supabase = await createClient();
   let q = supabase.from("matches").select(MATCH_SELECT).order("kickoff_at");

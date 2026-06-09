@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getProfile, getMatches, getTeams } from "@/lib/queries";
+import { getProfile, getMatches, getTeams, getPlayers } from "@/lib/queries";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { AdminMatchRow } from "@/components/AdminMatchRow";
 import { AdminSettlePanel } from "@/components/AdminSettlePanel";
@@ -12,7 +12,7 @@ export default async function AdminResultsPage() {
   const profile = await getProfile();
   if (!profile?.is_admin) redirect("/dashboard");
 
-  const [matches, teams] = await Promise.all([getMatches(), getTeams()]);
+  const [matches, teams, players] = await Promise.all([getMatches(), getTeams(), getPlayers()]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -37,7 +37,7 @@ export default async function AdminResultsPage() {
         );
       })}
 
-      <AdminSettlePanel teams={teams} />
+      <AdminSettlePanel teams={teams} players={players} />
     </div>
   );
 }

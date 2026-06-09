@@ -222,11 +222,44 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // One-time: populate the player list (Golden Boot picker) from squads. Only
+  // runs when the table is empty, so it costs exactly one extra API call ever.
+  let playersImported = 0;
+  const { count: playerCount } = await admin
+    .from("players")
+    .select("id", { count: "exact", head: true });
+  if ((playerCount ?? 0) === 0) {
+    const tRes = await fetch("https://api.football-data.org/v4/competitions/WC/teams", {
+      headers: { "X-Auth-Token": apiKey },
+      cache: "no-store",
+    });
+    if (tRes.ok) {
+      const tJson = (await tRes.json()) as {
+        teams?: {
+          squad?: { id: number; name: string; nationality: string | null; position: string | null }[];
+        }[];
+      };
+      const players = (tJson.teams ?? []).flatMap((t) =>
+        (t.squad ?? []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          nationality: p.nationality ?? null,
+          position: p.position ?? null,
+        }))
+      );
+      for (let i = 0; i < players.length; i += 500) {
+        await admin.from("players").upsert(players.slice(i, i + 500), { onConflict: "id" });
+      }
+      playersImported = players.length;
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     appliedCount: report.applied.length,
     timeUpdates: report.timeUpdates,
     teamsSet: report.teamsSet,
+    playersImported,
     applied: report.applied,
     unresolvedTeams: [...report.unresolved],
     unmatched: report.unmatched,

@@ -3,10 +3,17 @@
 import { useState, useTransition } from "react";
 import type { Team } from "@/lib/types";
 import { settleGroup, settleGoldenBoot, settlePodium } from "@/app/actions";
+import { PlayerCombobox } from "./PlayerCombobox";
 
 const GROUP_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 
-export function AdminSettlePanel({ teams }: { teams: Team[] }) {
+export function AdminSettlePanel({
+  teams,
+  players,
+}: {
+  teams: Team[];
+  players: { name: string; nationality: string | null }[];
+}) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [boot, setBoot] = useState("");
@@ -66,21 +73,15 @@ export function AdminSettlePanel({ teams }: { teams: Team[] }) {
         <div className="t-sm" style={{ color: "var(--text-2)" }}>
           Golden Boot — actual top scorer (+15)
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <input
-            className="input"
-            style={{ width: "auto", flex: "1 1 200px" }}
-            placeholder="e.g. Kylian Mbappé"
-            value={boot}
-            onChange={(e) => setBoot(e.target.value)}
-          />
+        <div className="flex flex-col gap-2">
+          <PlayerCombobox players={players} value={boot} onSelect={(name) => setBoot(name)} />
           <button
-            className="btn btn-primary"
+            className="btn btn-primary self-start"
             style={{ padding: "10px 16px", fontSize: 14 }}
             disabled={pending || !boot.trim()}
             onClick={() => run("Golden Boot", () => settleGoldenBoot(boot))}
           >
-            Settle
+            Settle Golden Boot
           </button>
         </div>
       </div>
