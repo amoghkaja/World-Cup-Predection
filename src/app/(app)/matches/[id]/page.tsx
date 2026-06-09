@@ -144,7 +144,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             {setup.goldenRequired ? " and the Golden Boot" : ""} before you can predict matches.
           </p>
           <Link
-            href="/dashboard"
+            href="/setup"
             className="btn btn-primary"
             style={{ marginTop: 4, padding: "10px 18px" }}
           >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { GroupPrediction, Team } from "@/lib/types";
 import { saveGroupPrediction } from "@/app/actions";
 import { Flag } from "./TeamBadge";
@@ -11,11 +11,13 @@ export function GroupPicker({
   teams,
   existing,
   locked,
+  onCompleteChange,
 }: {
   group: string;
   teams: Team[];
   existing: GroupPrediction | null;
   locked: boolean;
+  onCompleteChange?: (complete: boolean) => void;
 }) {
   const [winner, setWinner] = useState<number | null>(existing?.pred_winner_team_id ?? null);
   const [runnerup, setRunnerup] = useState<number | null>(existing?.pred_runnerup_team_id ?? null);
@@ -24,6 +26,15 @@ export function GroupPicker({
   const [err, setErr] = useState<string | null>(null);
 
   const complete = winner != null && runnerup != null;
+
+  // Report completion to a parent (the setup wizard) without re-render loops.
+  const cbRef = useRef(onCompleteChange);
+  useEffect(() => {
+    cbRef.current = onCompleteChange;
+  }, [onCompleteChange]);
+  useEffect(() => {
+    cbRef.current?.(complete);
+  }, [complete]);
 
   function persist(nextWinner: number | null, nextRunnerup: number | null) {
     setErr(null);

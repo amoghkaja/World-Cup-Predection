@@ -21,14 +21,14 @@ export function SetupChecklist({
       done: championSet,
       label: "Pick your podium",
       sub: "Champion, runner-up & third place — worth the most points",
-      href: "/tournament",
+      href: "/setup",
       icon: "trophy",
     },
     {
       done: groupsDone >= groupsTotal,
       label: `Call the group top two (${groupsDone}/${groupsTotal})`,
       sub: "Pick who finishes 1st & 2nd in each group",
-      href: "/groups",
+      href: "/setup",
       icon: "grid",
     },
     {
@@ -37,7 +37,7 @@ export function SetupChecklist({
       sub: goldenRequired
         ? "The tournament's top scorer"
         : "Optional — the tournament's top scorer",
-      href: "/tournament",
+      href: "/setup",
       icon: "bolt",
     },
   ];
