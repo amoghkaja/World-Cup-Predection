@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type {
   GroupPrediction,
@@ -19,20 +20,21 @@ export type PodiumWindows = {
 const MATCH_SELECT =
   "*, home_team:teams!home_team_id(*), away_team:teams!away_team_id(*)";
 
-export async function getCurrentUser() {
+// auth.getUser() is a network round-trip to Supabase Auth. A single page renders
+// the layout + several data queries, each of which needs the user — so we cache()
+// it to do exactly one validation per request instead of 5+.
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});
 
 export async function getProfile(): Promise<Profile | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return null;
+  const supabase = await createClient();
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   return data as Profile | null;
 }
@@ -58,35 +60,29 @@ export async function getMatch(id: number): Promise<MatchWithTeams | null> {
 }
 
 export async function getMyPredictions(): Promise<Map<number, Prediction>> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   const map = new Map<number, Prediction>();
   if (!user) return map;
+  const supabase = await createClient();
   const { data } = await supabase.from("predictions").select("*").eq("user_id", user.id);
   (data ?? []).forEach((p) => map.set((p as Prediction).match_id, p as Prediction));
   return map;
 }
 
 export async function getMyGroupPredictions(): Promise<Map<string, GroupPrediction>> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   const map = new Map<string, GroupPrediction>();
   if (!user) return map;
+  const supabase = await createClient();
   const { data } = await supabase.from("group_predictions").select("*").eq("user_id", user.id);
   (data ?? []).forEach((g) => map.set((g as GroupPrediction).group_label, g as GroupPrediction));
   return map;
 }
 
 export async function getMyTournamentPredictions(): Promise<TournamentPrediction[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return [];
+  const supabase = await createClient();
   const { data } = await supabase
     .from("tournament_predictions")
     .select("*")
@@ -106,11 +102,9 @@ export async function tournamentLockAt(): Promise<string | null> {
 }
 
 export async function getMyPodiumPredictions(): Promise<PodiumPrediction[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return [];
+  const supabase = await createClient();
   const { data } = await supabase
     .from("podium_predictions")
     .select("*")

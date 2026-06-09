@@ -8,10 +8,8 @@ name: Sync match results
 #   CRON_SECRET  the same value set in the app's environment
 
 on:
-  # Scheduled runs are PAUSED until the results data source is finalized and the
-  # APP_URL / CRON_SECRET repo secrets are set. Re-enable by uncommenting this block.
-  # schedule:
-  #   - cron: "*/30 * * * *"   # every 30 min
+  schedule:
+    - cron: "*/30 * * * *" # every 30 minutes (GitHub may delay scheduled runs)
   workflow_dispatch: {}
 
 jobs:

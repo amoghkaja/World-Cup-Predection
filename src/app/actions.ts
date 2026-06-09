@@ -44,17 +44,6 @@ export async function savePrediction(input: {
       return { ok: false, error: "Invalid outcome" };
     }
 
-    // Deadline check (RLS is the backstop, this gives a friendly error).
-    const { data: match } = await supabase
-      .from("matches")
-      .select("kickoff_at, home_team_id, away_team_id")
-      .eq("id", input.matchId)
-      .single();
-    if (!match) return { ok: false, error: "Match not found" };
-    if (new Date(match.kickoff_at).getTime() <= Date.now()) {
-      return { ok: false, error: "This match is locked — the deadline has passed." };
-    }
-
     const { error } = await supabase.from("predictions").upsert(
       {
         user_id: user.id,
@@ -66,7 +55,13 @@ export async function savePrediction(input: {
       },
       { onConflict: "user_id,match_id" }
     );
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      // RLS blocks writes once the match has kicked off — surface a friendly message.
+      if (error.code === "42501" || /row-level security/i.test(error.message)) {
+        return { ok: false, error: "This match is locked — the deadline has passed." };
+      }
+      return { ok: false, error: error.message };
+    }
 
     revalidatePath("/dashboard");
     revalidatePath("/bracket");
