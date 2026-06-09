@@ -92,9 +92,13 @@ export async function GET(req: NextRequest) {
     if (t.code) byKey.set(norm(t.code), t.id);
     byKey.set(norm(t.name), t.id);
   }
+  // football-data.org tla → our code, where they disagree.
+  const TLA_ALIAS: Record<string, string> = { cur: "cuw", ury: "uru" };
   const resolve = (t: FdTeam | undefined): number | null => {
     if (!t) return null;
-    if (t.tla && byKey.has(norm(t.tla))) return byKey.get(norm(t.tla))!;
+    const tla = t.tla ? norm(t.tla) : "";
+    if (tla && byKey.has(tla)) return byKey.get(tla)!;
+    if (tla && TLA_ALIAS[tla] && byKey.has(TLA_ALIAS[tla])) return byKey.get(TLA_ALIAS[tla])!;
     if (t.name && byKey.has(norm(t.name))) return byKey.get(norm(t.name))!;
     return null;
   };
