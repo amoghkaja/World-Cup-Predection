@@ -20,6 +20,8 @@ export function LocalTime({ iso }: { iso: string }) {
   const [local, setLocal] = useState<string | null>(null);
 
   useEffect(() => {
+    // Format in the browser's timezone, only after mount (avoids hydration mismatch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal(new Date(iso).toLocaleString(undefined, FMT));
   }, [iso]);
 
