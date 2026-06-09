@@ -63,8 +63,6 @@ export async function savePrediction(input: {
         pred_away_score: away,
         pred_outcome: input.outcome,
         submitted_at: new Date().toISOString(),
-        points_awarded: 0,
-        scored: false,
       },
       { onConflict: "user_id,match_id" }
     );
@@ -270,65 +268,15 @@ export async function savePodiumPick(input: {
   teamId: number | null;
 }): Promise<Result> {
   try {
-    const { supabase, user } = await requireUser();
-
-    // Which window are we in? (pre-group sets the "original"; post-group is a revision.)
-    const [{ data: firstRow }, { data: lastGroupRow }, { data: r32Row }] = await Promise.all([
-      supabase.from("matches").select("kickoff_at").order("kickoff_at").limit(1).maybeSingle(),
-      supabase
-        .from("matches")
-        .select("kickoff_at")
-        .eq("stage", "group")
-        .order("kickoff_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("matches")
-        .select("kickoff_at")
-        .eq("stage", "r32")
-        .order("kickoff_at")
-        .limit(1)
-        .maybeSingle(),
-    ]);
-    const now = Date.now();
-    const first = firstRow ? new Date(firstRow.kickoff_at).getTime() : Infinity;
-    const lastGroup = lastGroupRow ? new Date(lastGroupRow.kickoff_at).getTime() : Infinity;
-    const r32 = r32Row ? new Date(r32Row.kickoff_at).getTime() : Infinity;
-    const inWindow1 = now < first;
-    const inWindow2 = now >= lastGroup && now < r32;
-    if (!inWindow1 && !inWindow2) {
-      return {
-        ok: false,
-        error:
-          now < lastGroup
-            ? "Podium picks are locked during the group stage."
-            : "Podium picks are locked.",
-      };
-    }
-
-    const { data: existing } = await supabase
-      .from("podium_predictions")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("position", input.position)
-      .maybeSingle();
-
-    const original = inWindow1 ? input.teamId : existing?.original_team_id ?? null;
-    const revised = inWindow2 && input.teamId !== (existing?.original_team_id ?? null);
-
-    const { error } = await supabase.from("podium_predictions").upsert(
-      {
-        user_id: user.id,
-        position: input.position,
-        team_id: input.teamId,
-        original_team_id: original,
-        revised,
-        submitted_at: new Date().toISOString(),
-        points_awarded: 0,
-        scored: false,
-      },
-      { onConflict: "user_id,position" }
-    );
+    const { supabase } = await requireUser();
+    // All podium writes go through a SECURITY DEFINER function that enforces the
+    // two-window rule and computes original/revised server-side. Users can't write
+    // the table directly (migration 0004 revokes it), so the early/late value and
+    // the "revised" flag can't be forged.
+    const { error } = await supabase.rpc("save_podium_pick", {
+      p_position: input.position,
+      p_team_id: input.teamId,
+    });
     if (error) return { ok: false, error: error.message };
 
     revalidatePath("/tournament");

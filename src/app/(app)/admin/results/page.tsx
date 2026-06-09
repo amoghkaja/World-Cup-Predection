@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getProfile, getMatches, getTeams } from "@/lib/queries";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { AdminMatchRow } from "@/components/AdminMatchRow";
+import { AdminSettlePanel } from "@/components/AdminSettlePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,8 @@ export default async function AdminResultsPage() {
           </section>
         );
       })}
+
+      <AdminSettlePanel teams={teams} />
     </div>
   );
 }
