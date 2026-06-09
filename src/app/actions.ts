@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import {
   scorePrediction,
-  CHAMPION_POINTS,
-  FINALIST_POINTS,
+  scorePodium,
   GROUP_QUALIFIER_POINTS,
+  GOLDEN_BOOT_POINTS,
 } from "@/lib/scoring";
-import type { Match, PredOutcome, Prediction } from "@/lib/types";
+import type { Match, PodiumPosition, PredOutcome, Prediction } from "@/lib/types";
 
 type Result<T = void> = { ok: true; data?: T } | { ok: false; error: string };
 
@@ -198,6 +198,12 @@ export async function saveMatchResult(input: {
         .eq("id", p.id);
     }
 
+    // When the Final or 3rd-place game is settled, re-derive and score the podium.
+    const settledStage = (updated as Match).stage;
+    if (settledStage === "final" || settledStage === "third") {
+      await settlePodiumWith(admin);
+    }
+
     revalidatePath("/leaderboard");
     revalidatePath("/predictions");
     revalidatePath("/admin/results");
@@ -258,41 +264,154 @@ export async function settleGroup(input: {
   }
 }
 
-// Admin: settle the champion (and optionally finalists) and award points.
-export async function settleTournament(input: {
-  championId: number;
-  finalistIds?: number[];
+// ---------------- Podium (top-3) predictions ----------------
+export async function savePodiumPick(input: {
+  position: PodiumPosition;
+  teamId: number | null;
 }): Promise<Result> {
+  try {
+    const { supabase, user } = await requireUser();
+
+    // Which window are we in? (pre-group sets the "original"; post-group is a revision.)
+    const [{ data: firstRow }, { data: lastGroupRow }, { data: r32Row }] = await Promise.all([
+      supabase.from("matches").select("kickoff_at").order("kickoff_at").limit(1).maybeSingle(),
+      supabase
+        .from("matches")
+        .select("kickoff_at")
+        .eq("stage", "group")
+        .order("kickoff_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("matches")
+        .select("kickoff_at")
+        .eq("stage", "r32")
+        .order("kickoff_at")
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const now = Date.now();
+    const first = firstRow ? new Date(firstRow.kickoff_at).getTime() : Infinity;
+    const lastGroup = lastGroupRow ? new Date(lastGroupRow.kickoff_at).getTime() : Infinity;
+    const r32 = r32Row ? new Date(r32Row.kickoff_at).getTime() : Infinity;
+    const inWindow1 = now < first;
+    const inWindow2 = now >= lastGroup && now < r32;
+    if (!inWindow1 && !inWindow2) {
+      return {
+        ok: false,
+        error:
+          now < lastGroup
+            ? "Podium picks are locked during the group stage."
+            : "Podium picks are locked.",
+      };
+    }
+
+    const { data: existing } = await supabase
+      .from("podium_predictions")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("position", input.position)
+      .maybeSingle();
+
+    const original = inWindow1 ? input.teamId : existing?.original_team_id ?? null;
+    const revised = inWindow2 && input.teamId !== (existing?.original_team_id ?? null);
+
+    const { error } = await supabase.from("podium_predictions").upsert(
+      {
+        user_id: user.id,
+        position: input.position,
+        team_id: input.teamId,
+        original_team_id: original,
+        revised,
+        submitted_at: new Date().toISOString(),
+        points_awarded: 0,
+        scored: false,
+      },
+      { onConflict: "user_id,position" }
+    );
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/tournament");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// Derive the actual podium from the Final + 3rd-place results and score every pick.
+async function settlePodiumWith(admin: ReturnType<typeof createAdminClient>) {
+  const { data: finalMatch } = await admin
+    .from("matches")
+    .select("*")
+    .eq("stage", "final")
+    .eq("status", "final")
+    .maybeSingle();
+  if (!finalMatch || finalMatch.home_score == null || finalMatch.away_score == null) return;
+
+  const champ: number | null =
+    finalMatch.winner_team_id ??
+    (finalMatch.home_score > finalMatch.away_score
+      ? finalMatch.home_team_id
+      : finalMatch.away_team_id);
+  const runnerUp: number | null =
+    champ === finalMatch.home_team_id ? finalMatch.away_team_id : finalMatch.home_team_id;
+
+  const { data: thirdMatch } = await admin
+    .from("matches")
+    .select("*")
+    .eq("stage", "third")
+    .eq("status", "final")
+    .maybeSingle();
+  const third: number | null =
+    thirdMatch && thirdMatch.home_score != null && thirdMatch.away_score != null
+      ? thirdMatch.winner_team_id ??
+        (thirdMatch.home_score > thirdMatch.away_score
+          ? thirdMatch.home_team_id
+          : thirdMatch.away_team_id)
+      : null;
+
+  const actual: Record<number, number | null> = { 1: champ, 2: runnerUp, 3: third };
+  const { data: preds } = await admin.from("podium_predictions").select("*");
+  for (const p of preds ?? []) {
+    const want = actual[p.position];
+    const correct = want != null && p.team_id === want;
+    const pts = scorePodium(p.position, correct, p.revised);
+    await admin
+      .from("podium_predictions")
+      .update({ points_awarded: pts, scored: true })
+      .eq("id", p.id);
+  }
+}
+
+export async function settlePodium(): Promise<Result> {
   try {
     await requireAdmin();
     const admin = createAdminClient();
+    await settlePodiumWith(admin);
+    revalidatePath("/leaderboard");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
 
-    const { data: champPreds } = await admin
+// Admin: settle the Golden Boot by the top scorer's name.
+export async function settleGoldenBoot(name: string): Promise<Result> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
+    const target = name.trim().toLowerCase();
+    const { data: preds } = await admin
       .from("tournament_predictions")
       .select("*")
-      .eq("type", "champion");
-    for (const p of champPreds ?? []) {
-      const pts = p.team_id === input.championId ? CHAMPION_POINTS : 0;
+      .eq("type", "golden_boot");
+    for (const p of preds ?? []) {
+      const hit = !!target && (p.text_value ?? "").trim().toLowerCase() === target;
       await admin
         .from("tournament_predictions")
-        .update({ points_awarded: pts, scored: true })
+        .update({ points_awarded: hit ? GOLDEN_BOOT_POINTS : 0, scored: true })
         .eq("id", p.id);
     }
-
-    if (input.finalistIds?.length) {
-      const { data: finPreds } = await admin
-        .from("tournament_predictions")
-        .select("*")
-        .eq("type", "finalist");
-      for (const p of finPreds ?? []) {
-        const pts = input.finalistIds.includes(p.team_id ?? -1) ? FINALIST_POINTS : 0;
-        await admin
-          .from("tournament_predictions")
-          .update({ points_awarded: pts, scored: true })
-          .eq("id", p.id);
-      }
-    }
-
     revalidatePath("/leaderboard");
     return { ok: true };
   } catch (e) {

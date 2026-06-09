@@ -2,8 +2,7 @@ import {
   OUTCOME_POINTS,
   EXACT_BONUS,
   GROUP_QUALIFIER_POINTS,
-  CHAMPION_POINTS,
-  FINALIST_POINTS,
+  PODIUM_EARLY,
   GOLDEN_BOOT_POINTS,
   maxPointsForStage,
 } from "@/lib/scoring";
@@ -47,7 +46,7 @@ export default function ScoringPage() {
       soft: "var(--red-soft)",
       on: "var(--red-strong)",
       title: "Tournament bets",
-      desc: "Champion, finalists & more",
+      desc: "Podium, Golden Boot & more",
     },
   ];
 
@@ -56,8 +55,9 @@ export default function ScoringPage() {
   const bonuses: { icon: string; title: string; desc: string; pts: number }[] = [
     { icon: "grid", title: "Group winner", desc: "Top of the group", pts: GROUP_QUALIFIER_POINTS },
     { icon: "grid", title: "Group runner-up", desc: "Second place", pts: GROUP_QUALIFIER_POINTS },
-    { icon: "trophy", title: "Champion", desc: "Lifts the trophy", pts: CHAMPION_POINTS },
-    { icon: "medal", title: "Other finalist", desc: "Loses the final", pts: FINALIST_POINTS },
+    { icon: "trophy", title: "Champion · 1st", desc: "Predict the winner", pts: PODIUM_EARLY[0] },
+    { icon: "medal", title: "Runner-up · 2nd", desc: "Loses the final", pts: PODIUM_EARLY[1] },
+    { icon: "medal", title: "Third place · 3rd", desc: "Wins the 3rd-place game", pts: PODIUM_EARLY[2] },
     { icon: "bolt", title: "Golden Boot", desc: "Top scorer's nation", pts: GOLDEN_BOOT_POINTS },
   ];
 
@@ -278,7 +278,8 @@ export default function ScoringPage() {
       <div className="mb-3">
         <h2 className="t-h2">Group &amp; tournament bonuses</h2>
         <p className="t-sm" style={{ color: "var(--text-3)", marginTop: 3 }}>
-          One-off bets that pay big if you read the tournament right.
+          One-off bets that pay big if you read the tournament right. Podium picks earn the higher
+          value when locked before the group stage — revise after groups for a little less.
         </p>
       </div>
       <div className="card mb-6" style={{ overflow: "hidden" }}>
@@ -298,8 +299,8 @@ export default function ScoringPage() {
                 height: 38,
                 borderRadius: 11,
                 flex: "none",
-                background: b.pts >= FINALIST_POINTS ? "var(--gold-soft)" : "var(--surface-2)",
-                color: b.pts >= FINALIST_POINTS ? "var(--gold-strong)" : "var(--text-2)",
+                background: b.pts >= 10 ? "var(--gold-soft)" : "var(--surface-2)",
+                color: b.pts >= 10 ? "var(--gold-strong)" : "var(--text-2)",
               }}
             >
               <Icon name={b.icon} size={19} />

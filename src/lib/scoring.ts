@@ -1,63 +1,44 @@
 import type { Match, MatchStage, PredOutcome, Prediction } from "@/lib/types";
 
 /**
- * Scoring model: tiered by round + an early-bird time multiplier.
+ * Scoring model (v2): round-weighted match points + exact-score bonus — NO time multiplier.
  *
- *   points = round(base_points * time_multiplier)
+ *   points = OUTCOME_POINTS[stage]                         (correct result)
+ *          + EXACT_BONUS[stage]  (only if the exact score is also right)
  *
- * base_points = (correct outcome points for the stage)
- *             + (exact score bonus for the stage, if the exact score matched)
- *
- * The time multiplier rewards predicting earlier (riskier — no late team news).
+ * Podium (top-3) and group/Golden-Boot bonuses are awarded separately.
+ * All values live here — tune freely.
  */
 
 export const OUTCOME_POINTS: Record<MatchStage, number> = {
   group: 3,
   r32: 4,
   r16: 5,
-  qf: 7,
-  sf: 10,
-  third: 6,
-  final: 15,
-};
-
-export const EXACT_BONUS: Record<MatchStage, number> = {
-  group: 3,
-  r32: 4,
-  r16: 5,
   qf: 6,
   sf: 8,
-  third: 6,
-  final: 12,
+  third: 5,
+  final: 9,
 };
 
-// Special predictions
+// Added on top of OUTCOME_POINTS when the exact scoreline is correct
+// (so exact totals are: group 5, r32 6, r16 8, qf 10, sf 13, third 8, final 15).
+export const EXACT_BONUS: Record<MatchStage, number> = {
+  group: 2,
+  r32: 2,
+  r16: 3,
+  qf: 4,
+  sf: 5,
+  third: 3,
+  final: 6,
+};
+
+// Podium (top-3) per-position value. EARLY = set before the group stage and left unchanged;
+// LATE = revised in the post-group window. Index 0 = 1st, 1 = 2nd, 2 = 3rd.
+export const PODIUM_EARLY = [15, 12, 10];
+export const PODIUM_LATE = [12, 10, 8];
+
 export const GROUP_QUALIFIER_POINTS = 4; // per correct team (winner / runner-up)
-export const CHAMPION_POINTS = 30;
-export const FINALIST_POINTS = 10;
 export const GOLDEN_BOOT_POINTS = 15;
-
-/** Time-multiplier tiers, evaluated from most-early to least-early. */
-export const TIME_TIERS: { minHours: number; multiplier: number; label: string }[] = [
-  { minHours: 168, multiplier: 1.5, label: "7+ days early" },
-  { minHours: 72, multiplier: 1.3, label: "3–7 days early" },
-  { minHours: 24, multiplier: 1.15, label: "1–3 days early" },
-  { minHours: 0, multiplier: 1.0, label: "<24h before" },
-];
-
-export function timeMultiplier(submittedAt: Date | string, kickoffAt: Date | string): number {
-  return timeTier(submittedAt, kickoffAt).multiplier;
-}
-
-export function timeTier(submittedAt: Date | string, kickoffAt: Date | string) {
-  const submitted = new Date(submittedAt).getTime();
-  const kickoff = new Date(kickoffAt).getTime();
-  const hoursEarly = (kickoff - submitted) / 36e5;
-  for (const tier of TIME_TIERS) {
-    if (hoursEarly >= tier.minHours) return tier;
-  }
-  return TIME_TIERS[TIME_TIERS.length - 1];
-}
 
 /** The actual result of a finished match from the home team's perspective. */
 export function actualOutcome(home: number, away: number): PredOutcome {
@@ -67,8 +48,8 @@ export function actualOutcome(home: number, away: number): PredOutcome {
 }
 
 /**
- * The outcome a prediction is scored against. For group games this is the 90' result.
- * For knockout games a draw still has an advancer, so we use winner_team_id when set.
+ * The outcome a prediction is scored against. Group games use the 90' result; a level
+ * knockout still has an advancer, so we use winner_team_id when set.
  */
 export function actualOutcomeForMatch(match: Match): PredOutcome | null {
   if (match.status !== "final" || match.home_score == null || match.away_score == null) {
@@ -81,25 +62,28 @@ export function actualOutcomeForMatch(match: Match): PredOutcome | null {
   return actualOutcome(match.home_score, match.away_score);
 }
 
-/**
- * Compute points for a single match prediction against a finished match.
- * Returns 0 if the match isn't final.
- */
+/** Points for a single match prediction against a finished match (0 if not final). */
 export function scorePrediction(pred: Prediction, match: Match): number {
   const actual = actualOutcomeForMatch(match);
   if (actual == null) return 0;
   if (pred.pred_outcome !== actual) return 0; // wrong outcome → no points
-
   let base = OUTCOME_POINTS[match.stage];
   const exact =
     pred.pred_home_score === match.home_score && pred.pred_away_score === match.away_score;
   if (exact) base += EXACT_BONUS[match.stage];
-
-  const mult = timeMultiplier(pred.submitted_at, match.kickoff_at);
-  return Math.round(base * mult);
+  return base;
 }
 
-/** Max points obtainable for a match (exact score, predicted as early as possible). */
+/** Max points obtainable for a match (exact score). */
 export function maxPointsForStage(stage: MatchStage): number {
-  return Math.round((OUTCOME_POINTS[stage] + EXACT_BONUS[stage]) * TIME_TIERS[0].multiplier);
+  return OUTCOME_POINTS[stage] + EXACT_BONUS[stage];
+}
+
+/**
+ * Podium points for one position (1, 2 or 3): the early value if correct & not revised,
+ * the late value if correct & revised, otherwise 0.
+ */
+export function scorePodium(position: number, correct: boolean, revised: boolean): number {
+  if (!correct) return 0;
+  return (revised ? PODIUM_LATE : PODIUM_EARLY)[position - 1] ?? 0;
 }

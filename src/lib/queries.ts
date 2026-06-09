@@ -2,11 +2,18 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   GroupPrediction,
   MatchWithTeams,
+  PodiumPrediction,
   Prediction,
   Profile,
   Team,
   TournamentPrediction,
 } from "@/lib/types";
+
+export type PodiumWindows = {
+  firstKickoff: string | null;
+  lastGroupKickoff: string | null;
+  firstR32Kickoff: string | null;
+};
 
 // matches has 3 FKs to teams (home/away/winner) — disambiguate the embed by FK column.
 const MATCH_SELECT =
@@ -96,4 +103,45 @@ export async function tournamentLockAt(): Promise<string | null> {
     .limit(1)
     .single();
   return data?.kickoff_at ?? null;
+}
+
+export async function getMyPodiumPredictions(): Promise<PodiumPrediction[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("podium_predictions")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("position");
+  return (data ?? []) as PodiumPrediction[];
+}
+
+/** Boundary times for the two podium windows: first kickoff, last group kickoff, first R32 kickoff. */
+export async function podiumWindows(): Promise<PodiumWindows> {
+  const supabase = await createClient();
+  const [{ data: first }, { data: lastGroup }, { data: r32 }] = await Promise.all([
+    supabase.from("matches").select("kickoff_at").order("kickoff_at").limit(1).maybeSingle(),
+    supabase
+      .from("matches")
+      .select("kickoff_at")
+      .eq("stage", "group")
+      .order("kickoff_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("matches")
+      .select("kickoff_at")
+      .eq("stage", "r32")
+      .order("kickoff_at")
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  return {
+    firstKickoff: first?.kickoff_at ?? null,
+    lastGroupKickoff: lastGroup?.kickoff_at ?? null,
+    firstR32Kickoff: r32?.kickoff_at ?? null,
+  };
 }

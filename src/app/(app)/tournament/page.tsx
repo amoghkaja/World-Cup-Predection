@@ -1,9 +1,28 @@
-import { getTeams, getMyTournamentPredictions, tournamentLockAt } from "@/lib/queries";
+import {
+  getTeams,
+  getMyTournamentPredictions,
+  getMyPodiumPredictions,
+  podiumWindows,
+  tournamentLockAt,
+} from "@/lib/queries";
 import { isLocked, formatKickoff } from "@/lib/format";
 import { Countdown } from "@/components/Countdown";
-import { TournamentPicker } from "@/components/TournamentPicker";
+import { TournamentPicker, type PodiumWindowState } from "@/components/TournamentPicker";
 
 export const dynamic = "force-dynamic";
+
+function computeWindowState(w: {
+  firstKickoff: string | null;
+  lastGroupKickoff: string | null;
+  firstR32Kickoff: string | null;
+}): PodiumWindowState {
+  const now = Date.now();
+  const ms = (s: string | null) => (s ? new Date(s).getTime() : Infinity);
+  const first = ms(w.firstKickoff);
+  const lastGroup = ms(w.lastGroupKickoff);
+  const r32 = ms(w.firstR32Kickoff);
+  return now < first ? "pre" : now < lastGroup ? "group" : now < r32 ? "post" : "locked";
+}
 
 function PitchLines() {
   return (
@@ -33,12 +52,16 @@ function PitchLines() {
 }
 
 export default async function TournamentPage() {
-  const [teams, preds, lockAt] = await Promise.all([
+  const [teams, tourPreds, podium, windows, lockAt] = await Promise.all([
     getTeams(),
     getMyTournamentPredictions(),
+    getMyPodiumPredictions(),
+    podiumWindows(),
     tournamentLockAt(),
   ]);
   const locked = lockAt ? isLocked(lockAt) : false;
+  const golden = tourPreds.find((p) => p.type === "golden_boot") ?? null;
+  const windowState = computeWindowState(windows);
 
   return (
     <div className="flex flex-col gap-5 mx-auto w-full" style={{ maxWidth: 720 }}>
@@ -85,7 +108,7 @@ export default async function TournamentPage() {
         </div>
       </div>
 
-      <TournamentPicker teams={teams} existing={preds} locked={locked} />
+      <TournamentPicker teams={teams} podium={podium} golden={golden} windowState={windowState} />
     </div>
   );
 }

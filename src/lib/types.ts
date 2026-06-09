@@ -66,6 +66,20 @@ export interface TournamentPrediction {
   scored: boolean;
 }
 
+export type PodiumPosition = 1 | 2 | 3;
+
+export interface PodiumPrediction {
+  id: number;
+  user_id: string;
+  position: PodiumPosition;
+  team_id: number | null;
+  original_team_id: number | null; // the pick as of the pre-group window (for the early/late value)
+  revised: boolean;
+  submitted_at: string;
+  points_awarded: number;
+  scored: boolean;
+}
+
 export interface Profile {
   id: string;
   display_name: string | null;
