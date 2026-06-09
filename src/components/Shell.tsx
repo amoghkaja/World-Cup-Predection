@@ -143,12 +143,19 @@ export function Shell({
 
       {/* Mobile bottom tab bar */}
       <nav
-        className="md:hidden fixed inset-x-0 bottom-0 z-30 flex border-t"
+        className="md:hidden fixed z-30 flex"
         style={{
-          background: "var(--surface)",
-          borderColor: "var(--line)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-          boxShadow: "0 -2px 12px oklch(0 0 0 / 0.06)",
+          bottom: "calc(10px + env(safe-area-inset-bottom))",
+          left: "50%",
+          transform: "translateX(-50%)",
+          gap: 2,
+          padding: 6,
+          borderRadius: 999,
+          border: "1px solid var(--line)",
+          background: "color-mix(in oklch, var(--surface) 76%, transparent)",
+          WebkitBackdropFilter: "blur(14px)",
+          backdropFilter: "blur(14px)",
+          boxShadow: "var(--shadow-lg)",
         }}
       >
         {BOTTOM.map((n) => {
@@ -159,11 +166,17 @@ export function Shell({
             <Link
               key={n.href}
               href={n.href}
-              className="flex-1 flex flex-col items-center gap-1 py-2"
-              style={{ color: on ? "var(--brand)" : "var(--text-3)" }}
+              className="flex flex-col items-center gap-0.5"
+              style={{
+                color: on ? "var(--brand-strong)" : "var(--text-3)",
+                padding: "7px 13px",
+                borderRadius: 999,
+                background: on ? "var(--brand-soft)" : "transparent",
+                transition: "background .15s, color .15s",
+              }}
             >
-              <Icon name={n.icon} size={22} sw={on ? 2.4 : 2} />
-              <span style={{ fontSize: 10.5, fontWeight: on ? 800 : 600 }}>{n.label}</span>
+              <Icon name={n.icon} size={20} sw={on ? 2.4 : 2} />
+              <span style={{ fontSize: 10, fontWeight: on ? 800 : 600 }}>{n.label}</span>
             </Link>
           );
         })}

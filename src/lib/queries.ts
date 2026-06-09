@@ -51,6 +51,48 @@ export async function getPlayers(): Promise<{ name: string; nationality: string 
   return (data ?? []) as { name: string; nationality: string | null }[];
 }
 
+/**
+ * Whether a player has completed the required pre-tournament picks (champion, all
+ * 12 group top-twos, and Golden Boot). Golden Boot is only required once the player
+ * list is loaded. Cached per request — match-picking surfaces gate on `complete`.
+ */
+export const getSetupStatus = cache(async () => {
+  const user = await getCurrentUser();
+  const empty = {
+    championSet: false,
+    groupsDone: 0,
+    goldenSet: false,
+    goldenRequired: false,
+    complete: false,
+  };
+  if (!user) return empty;
+  const supabase = await createClient();
+  const [{ data: podium }, { data: groups }, { data: tour }, { count: playerCount }] =
+    await Promise.all([
+      supabase.from("podium_predictions").select("position, team_id").eq("user_id", user.id),
+      supabase
+        .from("group_predictions")
+        .select("pred_winner_team_id, pred_runnerup_team_id")
+        .eq("user_id", user.id),
+      supabase.from("tournament_predictions").select("type, text_value").eq("user_id", user.id),
+      supabase.from("players").select("id", { count: "exact", head: true }),
+    ]);
+  const podiumRows = (podium ?? []) as { position: number; team_id: number | null }[];
+  const groupRows = (groups ?? []) as {
+    pred_winner_team_id: number | null;
+    pred_runnerup_team_id: number | null;
+  }[];
+  const tourRows = (tour ?? []) as { type: string; text_value: string | null }[];
+  const championSet = podiumRows.some((p) => p.position === 1 && p.team_id != null);
+  const groupsDone = groupRows.filter(
+    (g) => g.pred_winner_team_id != null && g.pred_runnerup_team_id != null
+  ).length;
+  const goldenSet = tourRows.some((p) => p.type === "golden_boot" && !!p.text_value);
+  const goldenRequired = (playerCount ?? 0) > 0;
+  const complete = championSet && groupsDone >= 12 && (!goldenRequired || goldenSet);
+  return { championSet, groupsDone, goldenSet, goldenRequired, complete };
+});
+
 export async function getMatches(stage?: string): Promise<MatchWithTeams[]> {
   const supabase = await createClient();
   let q = supabase.from("matches").select(MATCH_SELECT).order("kickoff_at");

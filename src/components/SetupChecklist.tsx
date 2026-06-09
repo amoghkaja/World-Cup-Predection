@@ -8,11 +8,13 @@ export function SetupChecklist({
   groupsDone,
   groupsTotal,
   goldenSet,
+  goldenRequired,
 }: {
   championSet: boolean;
   groupsDone: number;
   groupsTotal: number;
   goldenSet: boolean;
+  goldenRequired?: boolean;
 }) {
   const items = [
     {
@@ -32,7 +34,9 @@ export function SetupChecklist({
     {
       done: goldenSet,
       label: "Name the Golden Boot",
-      sub: "Optional — the tournament's top scorer",
+      sub: goldenRequired
+        ? "The tournament's top scorer"
+        : "Optional — the tournament's top scorer",
       href: "/tournament",
       icon: "bolt",
     },

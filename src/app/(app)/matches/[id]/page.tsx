@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMatch, getMyPredictions } from "@/lib/queries";
+import { getMatch, getMyPredictions, getSetupStatus } from "@/lib/queries";
 import { isLocked, formatKickoff } from "@/lib/format";
 import { OUTCOME_POINTS, EXACT_BONUS, maxPointsForStage } from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/types";
@@ -17,12 +17,17 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const matchId = Number(id);
   if (!Number.isFinite(matchId)) notFound();
 
-  const [match, preds] = await Promise.all([getMatch(matchId), getMyPredictions()]);
+  const [match, preds, setup] = await Promise.all([
+    getMatch(matchId),
+    getMyPredictions(),
+    getSetupStatus(),
+  ]);
   if (!match) notFound();
 
   const existing = preds.get(match.id) ?? null;
   const locked = isLocked(match.kickoff_at);
   const open = !locked && match.status !== "final";
+  const gated = open && !setup.complete;
   const status: "open" | "live" | "done" | "locked" =
     match.status === "final" && match.home_score != null
       ? "done"
@@ -114,16 +119,48 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      {/* prediction form */}
-      <div className="card" style={{ padding: 18 }}>
-        <div className="flex flex-col" style={{ gap: 3, marginBottom: 14 }}>
-          <h2 className="t-h2">Your prediction</h2>
-          <span className="t-sm" style={{ color: "var(--text-3)" }}>
-            {open ? "Pick the outcome and exact score." : "This match is locked."}
+      {/* prediction form — or the pre-tournament setup gate */}
+      {gated ? (
+        <div
+          className="card flex flex-col items-center text-center"
+          style={{ padding: "28px 20px", gap: 10 }}
+        >
+          <span
+            className="grid place-items-center"
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 16,
+              background: "var(--surface-2)",
+              color: "var(--text-3)",
+            }}
+          >
+            <Icon name="lock" size={24} />
           </span>
+          <h2 className="t-h3">Finish your pre-tournament picks first</h2>
+          <p className="t-sm" style={{ color: "var(--text-3)", maxWidth: 320 }}>
+            Set your champion, every group&rsquo;s top two
+            {setup.goldenRequired ? " and the Golden Boot" : ""} before you can predict matches.
+          </p>
+          <Link
+            href="/dashboard"
+            className="btn btn-primary"
+            style={{ marginTop: 4, padding: "10px 18px" }}
+          >
+            Make my picks
+          </Link>
         </div>
-        <PredictionForm match={match} existing={existing} locked={!open} />
-      </div>
+      ) : (
+        <div className="card" style={{ padding: 18 }}>
+          <div className="flex flex-col" style={{ gap: 3, marginBottom: 14 }}>
+            <h2 className="t-h2">Your prediction</h2>
+            <span className="t-sm" style={{ color: "var(--text-3)" }}>
+              {open ? "Pick the outcome and exact score." : "This match is locked."}
+            </span>
+          </div>
+          <PredictionForm match={match} existing={existing} locked={!open} />
+        </div>
+      )}
 
       {/* points hint (gold) */}
       <div
