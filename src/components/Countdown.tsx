@@ -1,13 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { countdownTo, countdownLabel } from "@/lib/format";
+import { Icon } from "./Icon";
 
-export function Countdown({ kickoff, className }: { kickoff: string; className?: string }) {
+// Inline (icon + "2d 3h", red under 1h) and big (dd:hh:mm:ss cells) countdowns.
+export function Countdown({
+  kickoff,
+  variant = "inline",
+  lockLabel = "Locks in",
+  className,
+}: {
+  kickoff: string;
+  variant?: "inline" | "big" | "labeled";
+  lockLabel?: string;
+  className?: string;
+}) {
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
-    // Set the initial value off the render path (rAF), then tick every second.
     const raf = requestAnimationFrame(() => setNow(Date.now()));
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => {
@@ -16,24 +26,73 @@ export function Countdown({ kickoff, className }: { kickoff: string; className?:
     };
   }, []);
 
-  // Render nothing time-sensitive until mounted (avoids hydration mismatch).
   if (now === null) return <span className={className}>—</span>;
 
-  const c = countdownTo(kickoff, now);
-  if (c.locked) {
-    return (
-      <span className={`chip ${className ?? ""}`} style={{ color: "var(--danger)" }}>
-        🔒 Locked
+  const diff = new Date(kickoff).getTime() - now;
+  const locked = diff <= 0;
+  const s = Math.max(0, Math.floor(diff / 1000));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+
+  if (variant === "big") {
+    if (locked) {
+      return (
+        <span className={className} style={{ color: "var(--text-3)", fontWeight: 700 }}>
+          Kickoff has passed
+        </span>
+      );
+    }
+    const cell = (v: number, l: string) => (
+      <div className="flex flex-col items-center" style={{ minWidth: 58 }}>
+        <span className="t-display tnum" style={{ fontSize: 42 }}>
+          {String(v).padStart(2, "0")}
+        </span>
+        <span className="t-label" style={{ color: "var(--text-3)", marginTop: 4 }}>
+          {l}
+        </span>
+      </div>
+    );
+    const sep = (
+      <span className="t-display" style={{ fontSize: 34, color: "var(--line-strong)", marginTop: -6 }}>
+        :
       </span>
     );
+    return (
+      <div className={`flex items-center ${className ?? ""}`} style={{ gap: 10 }}>
+        {d > 0 && (
+          <>
+            {cell(d, "days")}
+            {sep}
+          </>
+        )}
+        {cell(h, "hrs")}
+        {sep}
+        {cell(m, "min")}
+        {sep}
+        {cell(sec, "sec")}
+      </div>
+    );
   }
-  const urgent = c.days === 0 && c.hours < 1;
+
+  const color = locked ? "var(--text-3)" : s < 3600 ? "var(--bad)" : "var(--text-2)";
+  let txt: string;
+  if (locked) txt = "Locked";
+  else if (d > 0) txt = `${d}d ${h}h`;
+  else if (h > 0) txt = `${h}h ${m}m`;
+  else txt = `${m}m ${String(sec).padStart(2, "0")}s`;
+
   return (
     <span
-      className={`chip ${className ?? ""}`}
-      style={{ color: urgent ? "var(--accent)" : "var(--muted)" }}
+      className={`tnum inline-flex items-center ${className ?? ""}`}
+      style={{ gap: 5, color, fontWeight: 700, fontSize: 13 }}
     >
-      ⏳ {countdownLabel(c)}
+      <Icon name={locked ? "lock" : "clock"} size={14} sw={2.2} />
+      {variant === "labeled" && !locked && (
+        <span style={{ color: "var(--text-3)", fontWeight: 600 }}>{lockLabel}</span>
+      )}
+      {txt}
     </span>
   );
 }
