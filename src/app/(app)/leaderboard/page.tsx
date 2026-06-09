@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/queries";
 import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
@@ -56,8 +57,9 @@ export default async function LeaderboardPage() {
                   ? "oklch(0.78 0.01 250)"
                   : "oklch(0.66 0.09 50)";
             return (
-              <div
+              <Link
                 key={row.user_id}
+                href={me(row) ? "/predictions" : `/u/${row.user_id}`}
                 className="anim-up flex flex-col items-center"
                 style={{ animationDelay: `${i * 0.08}s` }}
               >
@@ -123,7 +125,7 @@ export default async function LeaderboardPage() {
                     style={{ color: place === 1 ? "var(--gold)" : "var(--text-3)" }}
                   />
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

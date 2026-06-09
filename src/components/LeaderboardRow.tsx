@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
 import { Avatar } from "@/components/Avatar";
 
@@ -19,8 +20,9 @@ export function LeaderboardRow({
       : 0;
 
   return (
-    <div
-      className="flex items-center gap-3"
+    <Link
+      href={me ? "/predictions" : `/u/${row.user_id}`}
+      className="flex items-center gap-3 press"
       style={{
         padding: "12px 16px",
         background: me ? "var(--brand-soft)" : "transparent",
@@ -62,6 +64,6 @@ export function LeaderboardRow({
           pts
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

@@ -1,8 +1,17 @@
 import Link from "next/link";
-import { getMatches, getMyPredictions, getProfile } from "@/lib/queries";
+import {
+  getMatches,
+  getMyPredictions,
+  getProfile,
+  getMyPodiumPredictions,
+  getMyGroupPredictions,
+  getMyTournamentPredictions,
+  tournamentLockAt,
+} from "@/lib/queries";
 import { isLocked, serverNow } from "@/lib/format";
 import { DashboardMatchList } from "@/components/MatchCard";
 import { Icon } from "@/components/Icon";
+import { SetupChecklist } from "@/components/SetupChecklist";
 
 export const dynamic = "force-dynamic";
 
@@ -16,12 +25,24 @@ function eyebrowDate(now: number): string {
 }
 
 export default async function DashboardPage() {
-  const [matches, preds, profile] = await Promise.all([
+  const [matches, preds, profile, podium, groupPreds, tourPreds, lockAt] = await Promise.all([
     getMatches(),
     getMyPredictions(),
     getProfile(),
+    getMyPodiumPredictions(),
+    getMyGroupPredictions(),
+    getMyTournamentPredictions(),
+    tournamentLockAt(),
   ]);
   const now = serverNow();
+
+  const championSet = podium.some((p) => p.position === 1 && p.team_id != null);
+  const groupsDone = [...groupPreds.values()].filter(
+    (g) => g.pred_winner_team_id != null && g.pred_runnerup_team_id != null
+  ).length;
+  const goldenSet = tourPreds.some((p) => p.type === "golden_boot" && !!p.text_value);
+  const setupLocked = lockAt ? isLocked(lockAt, now) : false;
+  const showChecklist = !setupLocked && !(championSet && groupsDone >= 12);
 
   const isOpen = (kickoffIso: string, status: string) =>
     !isLocked(kickoffIso, now) && status !== "final";
@@ -82,8 +103,15 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* champion call-to-action */}
-      <Link
+      {showChecklist ? (
+        <SetupChecklist
+          championSet={championSet}
+          groupsDone={groupsDone}
+          groupsTotal={12}
+          goldenSet={goldenSet}
+        />
+      ) : (
+        <Link
         href="/tournament"
         className="lift"
         style={{
@@ -121,7 +149,8 @@ export default async function DashboardPage() {
           </span>
         </span>
         <Icon name="chevR" size={22} style={{ opacity: 0.9, flex: "none" }} />
-      </Link>
+        </Link>
+      )}
 
       {/* filterable, day-grouped match list */}
       <DashboardMatchList
