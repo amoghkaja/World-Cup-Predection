@@ -36,8 +36,8 @@ export default async function GroupsPage() {
         <div>
           <h1 className="t-h1">Group predictions</h1>
           <p className="t-sm" style={{ color: "var(--text-3)", marginTop: 4 }}>
-            Call the top two in each group. Correct winner = {GROUP_QUALIFIER_POINTS} pts,
-            runner-up = {GROUP_QUALIFIER_POINTS} pts.
+            Tap who finishes 1st and 2nd in every group — picks save automatically. Correct winner ={" "}
+            {GROUP_QUALIFIER_POINTS} pts, runner-up = {GROUP_QUALIFIER_POINTS} pts.
             {locked ? " Locked at first kickoff." : ""}
           </p>
         </div>

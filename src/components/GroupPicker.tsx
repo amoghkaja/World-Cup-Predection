@@ -18,16 +18,16 @@ export function GroupPicker({
   locked: boolean;
 }) {
   const [winner, setWinner] = useState<number | null>(existing?.pred_winner_team_id ?? null);
-  const [runnerup, setRunnerup] = useState<number | null>(
-    existing?.pred_runnerup_team_id ?? null,
-  );
+  const [runnerup, setRunnerup] = useState<number | null>(existing?.pred_runnerup_team_id ?? null);
   const [pending, start] = useTransition();
+  const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const complete = winner != null && runnerup != null;
 
   function persist(nextWinner: number | null, nextRunnerup: number | null) {
     setErr(null);
+    setSaved(false);
     start(async () => {
       const res = await saveGroupPrediction({
         groupLabel: group,
@@ -35,11 +35,15 @@ export function GroupPicker({
         runnerupId: nextRunnerup,
       });
       if (!res.ok) setErr(res.error);
+      else {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1600);
+      }
     });
   }
 
-  // Swap/clear pair: toggling a slot that already holds this team clears it;
-  // selecting a team already in the other slot swaps it out of there first.
+  // Tapping a slot that already holds the team clears it; picking a team that's
+  // in the other slot moves it here.
   function toggle(slot: "first" | "second", teamId: number) {
     if (locked) return;
     let nextWinner = winner;
@@ -65,10 +69,7 @@ export function GroupPicker({
   return (
     <div
       className="card overflow-hidden"
-      style={{
-        padding: 0,
-        borderColor: complete ? "var(--brand-ring)" : "var(--line)",
-      }}
+      style={{ padding: 0, borderColor: complete ? "var(--brand-ring)" : "var(--line)" }}
     >
       <div
         className="flex items-center justify-between px-4 py-3"
@@ -92,7 +93,14 @@ export function GroupPicker({
           </span>
           <span className="t-h3">Group {group}</span>
         </div>
-        {existing?.scored ? (
+        {pending ? (
+          <span className="pill pill-locked">Saving…</span>
+        ) : saved ? (
+          <span className="pill pill-done">
+            <Icon name="check" size={12} sw={3} />
+            Saved
+          </span>
+        ) : existing?.scored ? (
           <span className="pill pill-done">
             <Icon name="check" size={12} sw={3} />
             {existing.points_awarded} pts
@@ -103,26 +111,15 @@ export function GroupPicker({
             Set
           </span>
         ) : (
-          <span className="pill pill-open">Pick 2</span>
+          <span className="pill pill-open">Pick 1st &amp; 2nd</span>
         )}
       </div>
 
-      <div style={{ padding: "6px 10px 10px" }}>
-        <div
-          className="grid items-center"
-          style={{ gridTemplateColumns: "1fr 56px 56px", padding: "6px 6px 4px" }}
-        >
-          <span />
-          <span
-            className="t-xs text-center"
-            style={{ color: "var(--gold-strong)", fontWeight: 800 }}
-          >
-            1st
-          </span>
-          <span className="t-xs text-center" style={{ color: "var(--text-3)", fontWeight: 800 }}>
-            2nd
-          </span>
-        </div>
+      <div style={{ padding: "10px 10px 12px" }}>
+        <p className="t-xs" style={{ color: "var(--text-3)", padding: "0 4px 8px" }}>
+          Tap <b style={{ color: "var(--gold-strong)" }}>1st</b> for the group winner and{" "}
+          <b style={{ color: "var(--brand-strong)" }}>2nd</b> for the runner-up. Saves automatically.
+        </p>
 
         {teams.map((t) => {
           const isFirst = winner === t.id;
@@ -132,7 +129,8 @@ export function GroupPicker({
               key={t.id}
               className="grid items-center"
               style={{
-                gridTemplateColumns: "1fr 56px 56px",
+                gridTemplateColumns: "1fr 54px 54px",
+                gap: 6,
                 padding: "5px 6px",
                 borderRadius: 10,
                 background: isFirst || isSecond ? "var(--brand-soft)" : "transparent",
@@ -140,43 +138,24 @@ export function GroupPicker({
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <Flag flag={t.flag_emoji} name={t.name} size="sm" />
-                <span
-                  className="truncate"
-                  style={{ fontWeight: 700, fontSize: 14 }}
-                >
+                <span className="truncate" style={{ fontWeight: 700, fontSize: 14 }}>
                   {t.name}
                 </span>
               </div>
-              <PosToggle
-                on={isFirst}
-                kind="first"
-                disabled={locked || pending}
-                onClick={() => toggle("first", t.id)}
-              />
-              <PosToggle
-                on={isSecond}
-                kind="second"
-                disabled={locked || pending}
-                onClick={() => toggle("second", t.id)}
-              />
+              <PosToggle label="1st" on={isFirst} gold disabled={locked || pending} onClick={() => toggle("first", t.id)} />
+              <PosToggle label="2nd" on={isSecond} disabled={locked || pending} onClick={() => toggle("second", t.id)} />
             </div>
           );
         })}
       </div>
 
       {locked && (
-        <p
-          className="t-xs text-center"
-          style={{ color: "var(--text-3)", padding: "0 12px 12px" }}
-        >
+        <p className="t-xs text-center" style={{ color: "var(--text-3)", padding: "0 12px 12px" }}>
           <Icon name="lock" size={12} sw={2.4} style={{ verticalAlign: "-2px" }} /> Locked
         </p>
       )}
       {err && (
-        <p
-          className="t-xs text-center"
-          style={{ color: "var(--bad)", padding: "0 12px 12px" }}
-        >
+        <p className="t-xs text-center" style={{ color: "var(--bad)", padding: "0 12px 12px" }}>
           {err}
         </p>
       )}
@@ -185,51 +164,40 @@ export function GroupPicker({
 }
 
 function PosToggle({
+  label,
   on,
-  kind,
+  gold,
   disabled,
   onClick,
 }: {
+  label: string;
   on: boolean;
-  kind: "first" | "second";
+  gold?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }) {
-  const gold = kind === "first";
   return (
-    <div className="grid place-items-center">
-      <button
-        type="button"
-        aria-label={kind === "first" ? "Pick as winner" : "Pick as runner-up"}
-        aria-pressed={on}
-        disabled={disabled}
-        onClick={onClick}
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 11,
-          display: "grid",
-          placeItems: "center",
-          border: on ? "none" : "1.5px solid var(--line-strong)",
-          background: on ? (gold ? "var(--gold)" : "var(--brand)") : "transparent",
-          color: on ? (gold ? "var(--on-gold)" : "var(--on-brand)") : "var(--text-3)",
-          cursor: disabled ? "not-allowed" : "pointer",
-          transition: "all .15s",
-        }}
-      >
-        {on ? (
-          <Icon name="check" size={17} sw={3} />
-        ) : (
-          <span
-            style={{
-              width: 9,
-              height: 9,
-              borderRadius: 99,
-              background: "var(--line-strong)",
-            }}
-          />
-        )}
-      </button>
-    </div>
+    <button
+      type="button"
+      aria-label={gold ? "Pick as group winner (1st)" : "Pick as runner-up (2nd)"}
+      aria-pressed={on}
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex items-center justify-center gap-1"
+      style={{
+        height: 34,
+        borderRadius: 10,
+        border: on ? "none" : "1.5px solid var(--line-strong)",
+        background: on ? (gold ? "var(--gold)" : "var(--brand)") : "transparent",
+        color: on ? (gold ? "var(--on-gold)" : "var(--on-brand)") : "var(--text-3)",
+        fontWeight: 800,
+        fontSize: 12.5,
+        cursor: disabled ? "not-allowed" : "pointer",
+        transition: "all .15s",
+      }}
+    >
+      {on && <Icon name="check" size={13} sw={3} />}
+      {label}
+    </button>
   );
 }

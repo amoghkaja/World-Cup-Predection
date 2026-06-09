@@ -10,6 +10,7 @@ import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/TeamBadge";
 import { PointsBadge } from "@/components/PointsBadge";
+import { HowToPlayButton } from "@/components/HowToPlayButton";
 
 // Static explainer. Every number is pulled straight from @/lib/scoring so the
 // page can never drift from how points are actually awarded. No multiplier.
@@ -80,6 +81,7 @@ export default function ScoringPage() {
             You score on every single match — call the result, and nail the exact scoreline for a
             bonus on top. Then stake your big tournament bets. Here&rsquo;s the full breakdown.
           </p>
+          <HowToPlayButton />
           <div className="grid sm:grid-cols-3 gap-2.5 mt-[18px]">
             {ways.map((w) => (
               <div
