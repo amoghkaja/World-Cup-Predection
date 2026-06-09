@@ -94,7 +94,7 @@ export function Shell({
       </aside>
 
       {/* Content column */}
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-dvh">
         {/* Mobile top bar */}
         <header
           className="md:hidden flex items-center justify-between px-4 py-3 border-b sticky top-0 z-20"
@@ -148,6 +148,7 @@ export function Shell({
           background: "var(--surface)",
           borderColor: "var(--line)",
           paddingBottom: "env(safe-area-inset-bottom)",
+          boxShadow: "0 -2px 12px oklch(0 0 0 / 0.06)",
         }}
       >
         {BOTTOM.map((n) => {
