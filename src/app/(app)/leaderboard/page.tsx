@@ -13,11 +13,11 @@ export default async function LeaderboardPage() {
 
   const podium = rows.slice(0, 3);
   const rest = rows.slice(3);
-  // Display order: 2nd, 1st, 3rd.
+  // Display order: 2nd, 1st, 3rd. Tied players share the same rank number.
   const podiumOrder = [
-    { row: podium[1], place: 2 },
-    { row: podium[0], place: 1 },
-    { row: podium[2], place: 3 },
+    { row: podium[1], place: podium[1]?.rank ?? 2, slot: 2 },
+    { row: podium[0], place: podium[0]?.rank ?? 1, slot: 1 },
+    { row: podium[2], place: podium[2]?.rank ?? 3, slot: 3 },
   ].filter((p) => p.row);
 
   const firstName = (r: LeaderboardRowData) => (r.display_name ?? "Player").split(" ")[0];
@@ -132,7 +132,7 @@ export default async function LeaderboardPage() {
             <LeaderboardRow
               key={r.user_id}
               row={r}
-              rank={i + 4}
+              rank={r.rank}
               me={me(r)}
               last={i === rest.length - 1}
             />

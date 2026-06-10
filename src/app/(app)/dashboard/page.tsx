@@ -11,6 +11,7 @@ import { isLocked, serverNow } from "@/lib/format";
 import { DashboardMatchList } from "@/components/MatchCard";
 import { Icon } from "@/components/Icon";
 import { SetupChecklist } from "@/components/SetupChecklist";
+import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
 
 export const dynamic = "force-dynamic";
 
@@ -42,20 +43,58 @@ export default async function DashboardPage() {
     !isLocked(kickoffIso, now) && status !== "final";
 
   const openMatches = matches.filter((m) => isOpen(m.kickoff_at, m.status));
-  const openCount = openMatches.length;
-  const toPick = openMatches.filter((m) => !preds.has(m.id)).length;
+  const unpicked = openMatches.filter((m) => !preds.has(m.id));
+  const toPick = unpicked.length;
+
+  // Reminder: open matches kicking off within 24h that still have no pick.
+  const soon = unpicked.filter(
+    (m) => new Date(m.kickoff_at).getTime() - now < 24 * 3600 * 1000
+  );
+
+  // "While you were away" recap: every settled match the player had a pick on.
+  // The client only surfaces ones it hasn't shown before.
+  const recap: RecapEntry[] = matches
+    .filter(
+      (m) =>
+        m.status === "final" &&
+        m.home_score != null &&
+        m.away_score != null &&
+        preds.get(m.id)?.scored
+    )
+    .sort((a, b) => b.kickoff_at.localeCompare(a.kickoff_at))
+    .slice(0, 40)
+    .map((m) => {
+      const p = preds.get(m.id)!;
+      return {
+        id: m.id,
+        home: m.home_team?.code ?? "?",
+        homeFlag: m.home_team?.flag_emoji ?? null,
+        away: m.away_team?.code ?? "?",
+        awayFlag: m.away_team?.flag_emoji ?? null,
+        hs: m.home_score!,
+        as: m.away_score!,
+        ph: p.pred_home_score,
+        pa: p.pred_away_score,
+        pts: p.points_awarded,
+      };
+    });
 
   const greetingName = profile?.display_name?.split(" ")[0] ?? "there";
 
-  const myIndex = board.findIndex((r) => r.user_id === profile?.id);
+  const my = board.find((r) => r.user_id === profile?.id);
   const stats: { value: string; label: string; gold?: boolean }[] = [
-    { value: myIndex >= 0 ? `#${myIndex + 1}` : "—", label: "Rank" },
-    { value: myIndex >= 0 ? String(board[myIndex].total_points) : "—", label: "Points" },
+    { value: my ? `#${my.rank}` : "—", label: "Rank" },
+    { value: my ? String(my.total_points) : "—", label: "Points" },
     { value: gated ? "—" : String(toPick), label: "To pick", gold: !gated && toPick > 0 },
   ];
 
   return (
     <div className="flex flex-col" style={{ gap: 18 }}>
+      <PointsRecap
+        entries={recap}
+        totalPoints={my?.total_points ?? 0}
+        rank={my?.rank ?? null}
+      />
       {/* greeting + stat band */}
       <div className="flex flex-wrap items-center justify-between" style={{ gap: 14 }}>
         <div>
@@ -169,11 +208,48 @@ export default async function DashboardPage() {
             <Icon name="chevR" size={22} style={{ opacity: 0.9, flex: "none" }} />
           </Link>
 
+          {/* picks-due reminder */}
+          {soon.length > 0 && (
+            <Link
+              href={`/matches/${soon[0].id}`}
+              className="card lift flex items-center gap-3"
+              style={{
+                padding: "14px 16px",
+                background: "var(--gold-soft)",
+                border: "1px solid transparent",
+              }}
+            >
+              <span
+                className="grid place-items-center"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 11,
+                  flex: "none",
+                  background: "var(--gold)",
+                  color: "var(--on-gold)",
+                }}
+              >
+                <Icon name="bolt" size={19} />
+              </span>
+              <span style={{ flex: 1, color: "var(--on-gold)" }}>
+                <span style={{ display: "block", fontWeight: 800, fontSize: 14.5 }}>
+                  {soon.length} match{soon.length > 1 ? "es" : ""} lock
+                  {soon.length === 1 ? "s" : ""} within 24 hours
+                </span>
+                <span className="t-xs" style={{ display: "block", opacity: 0.8 }}>
+                  No pick = no points — get yours in before kickoff.
+                </span>
+              </span>
+              <Icon name="chevR" size={18} style={{ color: "var(--on-gold)", flex: "none" }} />
+            </Link>
+          )}
+
           {/* filterable, day-grouped match list */}
           <DashboardMatchList
             matches={matches}
             predictions={[...preds.entries()]}
-            openCount={openCount}
+            toPickCount={toPick}
           />
         </>
       )}

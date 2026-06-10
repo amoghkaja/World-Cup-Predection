@@ -51,19 +51,15 @@ export function MatchCard({
         ? 0
         : 1
       : -1;
-  // the side our prediction backed (home/away) — used to show a tick pre-result
-  const pickedSide = prediction
-    ? prediction.pred_outcome === "home"
-      ? 0
-      : prediction.pred_outcome === "away"
-      ? 1
-      : -1
-    : -2;
+  const homeName = match.home_team?.name ?? match.home_placeholder ?? "TBD";
+  const awayName = match.away_team?.name ?? match.away_placeholder ?? "TBD";
 
-  const rows: { team: typeof match.home_team; placeholder: string | null; goals: number | null; idx: number }[] = [
-    { team: match.home_team, placeholder: match.home_placeholder, goals: finished ? match.home_score : null, idx: 0 },
-    { team: match.away_team, placeholder: match.away_placeholder, goals: finished ? match.away_score : null, idx: 1 },
-  ];
+  // pick pill: green tick when it scored, neutral cross on a miss, brand pre-result
+  const pillLook = !finished
+    ? { bg: "var(--brand-soft)", fg: "var(--brand-strong)", icon: "target" }
+    : earned > 0
+      ? { bg: "var(--good-soft)", fg: "var(--good)", icon: "check" }
+      : { bg: "var(--surface-2)", fg: "var(--text-3)", icon: "x" };
 
   return (
     <div className="card lift" style={{ overflow: "hidden" }}>
@@ -78,46 +74,77 @@ export function MatchCard({
         <StatusPill status={status} predicted={!!prediction} />
       </div>
 
-      {/* teams — stacked, never truncates */}
-      <div className="flex flex-col" style={{ gap: 6, padding: "12px 16px 14px" }}>
-        {rows.map((r) => {
-          const dimmed = finished && winSide >= 0 && winSide !== r.idx;
-          const name = r.team?.name ?? r.placeholder ?? "TBD";
-          return (
-            <div key={r.idx} className="flex items-center" style={{ gap: 11 }}>
-              <Flag flag={r.team?.flag_emoji} name={name} size="lg" />
-              <span
-                className="flex-1 truncate"
-                style={{
-                  fontWeight: 800,
-                  fontSize: 16.5,
-                  color: dimmed ? "var(--text-3)" : r.team ? "var(--text)" : "var(--text-3)",
-                }}
-              >
-                {name}
-              </span>
-              {prediction && !finished && pickedSide === r.idx && (
-                <Icon name="check" size={15} sw={2.6} style={{ color: "var(--brand)" }} />
-              )}
-              {finished && (
-                <span
-                  className="tnum"
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontWeight: 800,
-                    fontSize: 24,
-                    color: dimmed ? "var(--text-3)" : "var(--text)",
-                    minWidth: 22,
-                    textAlign: "center",
-                  }}
-                >
-                  {r.goals}
-                </span>
-              )}
-            </div>
-          );
-        })}
+      {/* teams — one line: home · vs / score · away */}
+      <div className="flex items-center" style={{ gap: 9, padding: "13px 16px" }}>
+        <Flag flag={match.home_team?.flag_emoji} name={homeName} />
+        <span
+          className="truncate"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontWeight: 800,
+            fontSize: 15.5,
+            color:
+              finished && winSide === 1
+                ? "var(--text-3)"
+                : match.home_team
+                  ? "var(--text)"
+                  : "var(--text-3)",
+          }}
+        >
+          {homeName}
+        </span>
+        {finished ? (
+          <span
+            className="tnum"
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: 21,
+              whiteSpace: "nowrap",
+              padding: "0 2px",
+            }}
+          >
+            {match.home_score}–{match.away_score}
+          </span>
+        ) : (
+          <span className="t-label" style={{ color: "var(--text-3)" }}>
+            vs
+          </span>
+        )}
+        <span
+          className="truncate"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontWeight: 800,
+            fontSize: 15.5,
+            textAlign: "right",
+            color:
+              finished && winSide === 0
+                ? "var(--text-3)"
+                : match.away_team
+                  ? "var(--text)"
+                  : "var(--text-3)",
+          }}
+        >
+          {awayName}
+        </span>
+        <Flag flag={match.away_team?.flag_emoji} name={awayName} />
       </div>
+
+      {/* your pick — always visible at a glance while scrolling */}
+      {prediction && (
+        <div style={{ padding: "0 16px 13px" }}>
+          <span
+            className="pill"
+            style={{ background: pillLook.bg, color: pillLook.fg, fontSize: 12, padding: "5px 11px" }}
+          >
+            <Icon name={pillLook.icon} size={12} sw={2.8} />
+            Your pick {prediction.pred_home_score}–{prediction.pred_away_score}
+          </span>
+        </div>
+      )}
 
       {/* footer: countdown / status · your pick · action */}
       <div
@@ -139,14 +166,6 @@ export function MatchCard({
             >
               <Icon name="lock" size={13} />
               {status === "live" ? "In progress" : finished ? "Full time" : "Locked"}
-            </span>
-          )}
-          {prediction && !editing && (
-            <span
-              className="t-sm tnum"
-              style={{ color: "var(--text-2)", fontWeight: 700, whiteSpace: "nowrap" }}
-            >
-              · Pick {prediction.pred_home_score}–{prediction.pred_away_score}
             </span>
           )}
         </div>
@@ -198,25 +217,26 @@ function dayLabel(iso: string): string {
   });
 }
 
-type Filter = "all" | "open" | "mine";
+type Filter = "all" | "topick" | "mine";
 
 // Dashboard match list with the Segmented filter + day grouping (interactive island).
 export function DashboardMatchList({
   matches,
   predictions,
-  openCount,
+  toPickCount,
 }: {
   matches: MatchWithTeams[];
   /** [matchId, prediction] entries (Maps aren't serializable across the RSC boundary) */
   predictions: [number, Prediction][];
-  openCount: number;
+  toPickCount: number;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const predMap = useMemo(() => new Map(predictions), [predictions]);
 
   const list = useMemo(() => {
     return matches.filter((m) => {
-      if (filter === "open") return !isLocked(m.kickoff_at) && m.status !== "final";
+      if (filter === "topick")
+        return !isLocked(m.kickoff_at) && m.status !== "final" && !predMap.has(m.id);
       if (filter === "mine") return predMap.has(m.id);
       return true;
     });
@@ -237,7 +257,7 @@ export function DashboardMatchList({
       <Segmented
         options={[
           { key: "all", label: "All" },
-          { key: "open", label: "Open", count: openCount },
+          { key: "topick", label: "To pick", count: toPickCount },
           { key: "mine", label: "My picks" },
         ]}
         value={filter}
@@ -251,7 +271,9 @@ export function DashboardMatchList({
         >
           <span className="t-h3">No matches here</span>
           <span className="t-sm" style={{ color: "var(--text-3)", maxWidth: 280 }}>
-            Try a different filter — open matches appear as kickoff approaches.
+            {filter === "topick"
+              ? "You're all caught up — every open match has your pick on it."
+              : "Try a different filter."}
           </span>
         </div>
       )}

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/queries";
-import type { LeaderboardRow, MatchWithTeams, Prediction, Profile } from "@/lib/types";
+import { getCurrentUser, getLeaderboard } from "@/lib/queries";
+import type { MatchWithTeams, Prediction, Profile } from "@/lib/types";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
 import { CompactPredictionRow } from "@/components/CompactPredictionRow";
@@ -23,18 +23,17 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   if (me?.id === id) redirect("/predictions");
 
   const supabase = await createClient();
-  const [{ data: prof }, { data: board }, { data: rows }] = await Promise.all([
+  const [{ data: prof }, lb, { data: rows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
-    supabase.from("leaderboard").select("*").order("total_points", { ascending: false }),
+    getLeaderboard(),
     supabase.from("predictions").select(SELECT).eq("user_id", id),
   ]);
   if (!prof) notFound();
   const profile = prof as Profile;
 
-  const lb = (board ?? []) as LeaderboardRow[];
-  const idx = lb.findIndex((r) => r.user_id === id);
-  const rank = idx >= 0 ? idx + 1 : null;
-  const points = idx >= 0 ? lb[idx].total_points : 0;
+  const mine = lb.find((r) => r.user_id === id);
+  const rank = mine?.rank ?? null;
+  const points = mine?.total_points ?? 0;
 
   const items = ((rows ?? []) as unknown as Row[])
     .filter((p) => p.match)

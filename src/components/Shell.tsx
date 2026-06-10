@@ -12,13 +12,14 @@ type NavItem = { href: string; label: string; icon: string };
 const BOTTOM: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/bracket", label: "Bracket", icon: "bracket" },
-  { href: "/groups", label: "Groups", icon: "grid" },
+  { href: "/results", label: "Results", icon: "table" },
   { href: "/leaderboard", label: "Board", icon: "medal" },
   { href: "/profile", label: "Profile", icon: "user" },
 ];
 const SIDE: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "home" },
   { href: "/predictions", label: "My Predictions", icon: "list" },
+  { href: "/results", label: "Results & Tables", icon: "table" },
   { href: "/bracket", label: "Knockout", icon: "bracket" },
   { href: "/groups", label: "Groups", icon: "grid" },
   { href: "/tournament", label: "Tournament", icon: "trophy" },
@@ -28,7 +29,7 @@ const SIDE: NavItem[] = [
 ];
 
 // Routes without their own tab map onto Home for the mobile highlight.
-const HOME_ALIASES = ["/matches", "/predictions", "/tournament", "/scoring", "/admin"];
+const HOME_ALIASES = ["/matches", "/predictions", "/tournament", "/scoring", "/admin", "/groups"];
 
 export function Shell({
   profile,

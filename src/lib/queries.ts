@@ -40,13 +40,29 @@ export async function getProfile(): Promise<Profile | null> {
   return data as Profile | null;
 }
 
-export const getLeaderboard = cache(async (): Promise<LeaderboardRow[]> => {
+export type RankedLeaderboardRow = LeaderboardRow & { rank: number };
+
+/**
+ * Leaderboard sorted by points, then correct results, then name — and ranked
+ * with ties sharing a rank (1, 1, 3 …), so equal points means equal rank.
+ */
+export const getLeaderboard = cache(async (): Promise<RankedLeaderboardRow[]> => {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("leaderboard")
-    .select("*")
-    .order("total_points", { ascending: false });
-  return (data ?? []) as LeaderboardRow[];
+  const { data } = await supabase.from("leaderboard").select("*");
+  const rows = ((data ?? []) as LeaderboardRow[]).sort(
+    (a, b) =>
+      b.total_points - a.total_points ||
+      b.correct_matches - a.correct_matches ||
+      (a.display_name ?? "").localeCompare(b.display_name ?? "")
+  );
+  let prevPts = NaN;
+  let prevRank = 0;
+  return rows.map((r, i) => {
+    const rank = r.total_points === prevPts ? prevRank : i + 1;
+    prevPts = r.total_points;
+    prevRank = rank;
+    return { ...r, rank };
+  });
 });
 
 export async function getTeams(): Promise<Team[]> {

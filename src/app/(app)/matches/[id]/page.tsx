@@ -75,26 +75,61 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <StatusPill status={status} predicted={!!existing} />
         </div>
 
-        <div
-          className="grid items-center"
-          style={{ gridTemplateColumns: "1fr auto 1fr", gap: 10, padding: "26px 18px 8px" }}
-        >
-          <div className="text-center">
-            <Flag flag={match.home_team?.flag_emoji} name={homeName} size="lg" />
-            <div style={{ fontWeight: 800, fontSize: 17, marginTop: 8 }}>{homeName}</div>
-          </div>
-          <div className="t-label" style={{ color: "var(--text-3)" }}>
-            vs
-          </div>
-          <div className="text-center">
-            <Flag flag={match.away_team?.flag_emoji} name={awayName} size="lg" />
-            <div style={{ fontWeight: 800, fontSize: 17, marginTop: 8 }}>{awayName}</div>
-          </div>
+        <div className="flex items-center" style={{ gap: 10, padding: "24px 18px 8px" }}>
+          <Flag flag={match.home_team?.flag_emoji} name={homeName} size="lg" />
+          <span
+            className="truncate"
+            style={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: 16.5 }}
+          >
+            {homeName}
+          </span>
+          {status === "done" && match.home_score != null ? (
+            <span
+              className="tnum"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 800,
+                fontSize: 26,
+                whiteSpace: "nowrap",
+                padding: "0 4px",
+              }}
+            >
+              {match.home_score}–{match.away_score}
+            </span>
+          ) : (
+            <span className="t-label" style={{ color: "var(--text-3)" }}>
+              vs
+            </span>
+          )}
+          <span
+            className="truncate"
+            style={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: 16.5, textAlign: "right" }}
+          >
+            {awayName}
+          </span>
+          <Flag flag={match.away_team?.flag_emoji} name={awayName} size="lg" />
         </div>
+
+        {existing && (
+          <div className="flex justify-center" style={{ paddingBottom: 4 }}>
+            <span
+              className="pill"
+              style={{
+                background: "var(--brand-soft)",
+                color: "var(--brand-strong)",
+                fontSize: 12,
+                padding: "5px 11px",
+              }}
+            >
+              <Icon name="target" size={12} sw={2.8} />
+              Your pick {existing.pred_home_score}–{existing.pred_away_score}
+            </span>
+          </div>
+        )}
 
         <div
           className="t-sm text-center"
-          style={{ color: "var(--text-3)", paddingBottom: 18 }}
+          style={{ color: "var(--text-3)", paddingBottom: 18, paddingTop: 6 }}
         >
           <LocalTime iso={match.kickoff_at} />
           {match.label ? ` · ${match.label}` : ""}

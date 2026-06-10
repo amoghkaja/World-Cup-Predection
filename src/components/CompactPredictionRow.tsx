@@ -41,21 +41,41 @@ export function CompactPredictionRow({
             <span style={{ fontWeight: 700, fontSize: 14 }}>{home?.code ?? "?"}</span>
             <span
               className="tnum"
-              style={{ color: "var(--text-3)", fontWeight: 700, fontSize: 13, margin: "0 2px" }}
+              style={{
+                color: settled ? "var(--text)" : "var(--text-3)",
+                fontWeight: settled ? 800 : 700,
+                fontSize: 13,
+                margin: "0 2px",
+              }}
             >
-              {pred.pred_home_score}–{pred.pred_away_score}
+              {settled ? `${match.home_score}–${match.away_score}` : "vs"}
             </span>
             <span style={{ fontWeight: 700, fontSize: 14 }}>{away?.code ?? "?"}</span>
             <Flag flag={away?.flag_emoji} name={away?.name} size="sm" />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className="pill tnum"
+              style={{
+                background: settled
+                  ? correct
+                    ? "var(--good-soft)"
+                    : "var(--surface-2)"
+                  : "var(--brand-soft)",
+                color: settled
+                  ? correct
+                    ? "var(--good)"
+                    : "var(--text-3)"
+                  : "var(--brand-strong)",
+                fontSize: 11,
+                padding: "3px 9px",
+              }}
+            >
+              Your pick {pred.pred_home_score}–{pred.pred_away_score}
+            </span>
             <span className="t-xs" style={{ color: "var(--text-3)" }}>
               {match.group_label ? `Group ${match.group_label}` : "Knockout"}
-              {settled
-                ? ` · Final ${match.home_score}–${match.away_score}`
-                : locked
-                  ? " · In progress"
-                  : ""}
+              {!settled && locked ? " · In progress" : ""}
             </span>
             {!settled && !locked && (
               <Countdown kickoff={match.kickoff_at} variant="labeled" lockLabel="Locks in" />
