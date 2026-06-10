@@ -3,6 +3,24 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 
+// One shared 1s ticker for every countdown on screen — 100 match cards used to
+// each run their own interval + re-render every second, which made the whole
+// page feel laggy on phones.
+type Tick = () => void;
+const subs = new Set<Tick>();
+let timer: ReturnType<typeof setInterval> | null = null;
+function subscribe(fn: Tick): () => void {
+  subs.add(fn);
+  if (!timer) timer = setInterval(() => subs.forEach((s) => s()), 1000);
+  return () => {
+    subs.delete(fn);
+    if (subs.size === 0 && timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+}
+
 // Inline (icon + "2d 3h", red under 1h) and big (dd:hh:mm:ss cells) countdowns.
 export function Countdown({
   kickoff,
@@ -16,15 +34,23 @@ export function Countdown({
   className?: string;
 }) {
   const [now, setNow] = useState<number | null>(null);
+  const perSecond = variant === "big";
 
   useEffect(() => {
-    const raf = requestAnimationFrame(() => setNow(Date.now()));
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearInterval(t);
+    const ko = new Date(kickoff).getTime();
+    // Quantize "now" to the coarsest step the display can show ("2d 3h" only
+    // changes hourly) — identical state means React skips the re-render.
+    const compute = () => {
+      const n = Date.now();
+      const diff = ko - n;
+      if (diff <= 0) return ko; // locked: stable value, no further re-renders
+      const step = perSecond || diff < 3_600_000 ? 1000 : diff < 86_400_000 ? 60_000 : 3_600_000;
+      return Math.floor(n / step) * step;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only clock seed
+    setNow(compute());
+    return subscribe(() => setNow(compute()));
+  }, [kickoff, perSecond]);
 
   if (now === null) return <span className={className}>—</span>;
 

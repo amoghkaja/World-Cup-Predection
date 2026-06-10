@@ -110,6 +110,26 @@ export async function saveTournamentPrediction(input: {
 }): Promise<Result> {
   try {
     const { supabase, user } = await requireUser();
+
+    // Golden Boot must be a real player from the squad list (when we have one) —
+    // the picker enforces this in the UI, this enforces it against direct calls.
+    if (input.type === "golden_boot" && input.textValue?.trim()) {
+      const { data: hit } = await supabase
+        .from("players")
+        .select("id")
+        .ilike("name", input.textValue.trim())
+        .limit(1)
+        .maybeSingle();
+      if (!hit) {
+        const { count } = await supabase
+          .from("players")
+          .select("id", { count: "exact", head: true });
+        if ((count ?? 0) > 0) {
+          return { ok: false, error: "Pick a player from the list." };
+        }
+      }
+    }
+
     // single champion pick: clear previous of same type first
     await supabase
       .from("tournament_predictions")
@@ -133,6 +153,24 @@ export async function saveTournamentPrediction(input: {
 }
 
 // ---------------- Profile ----------------
+// Show / hide the Google profile photo. When hidden, everyone (including the
+// leaderboard view, server-side) sees initials instead.
+export async function setAvatarHidden(hidden: boolean): Promise<Result> {
+  try {
+    const { supabase, user } = await requireUser();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ hide_avatar: hidden })
+      .eq("id", user.id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/profile");
+    revalidatePath("/leaderboard");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 export async function updateDisplayName(name: string): Promise<Result> {
   try {
     const { supabase, user } = await requireUser();

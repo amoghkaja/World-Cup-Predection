@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type {
   GroupPrediction,
+  LeaderboardRow,
   MatchWithTeams,
   PodiumPrediction,
   Prediction,
@@ -38,6 +39,15 @@ export async function getProfile(): Promise<Profile | null> {
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   return data as Profile | null;
 }
+
+export const getLeaderboard = cache(async (): Promise<LeaderboardRow[]> => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("leaderboard")
+    .select("*")
+    .order("total_points", { ascending: false });
+  return (data ?? []) as LeaderboardRow[];
+});
 
 export async function getTeams(): Promise<Team[]> {
   const supabase = await createClient();

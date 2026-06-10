@@ -30,7 +30,11 @@ export function Avatar({
       />
     );
   }
-  const initial = (name ?? "?").trim().charAt(0).toUpperCase() || "?";
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  const initial =
+    words.length >= 2
+      ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
+      : (words[0]?.[0] ?? "?").toUpperCase();
   const hue = hueFromString(name ?? "?");
   return (
     <div
@@ -44,7 +48,8 @@ export function Avatar({
         display: "grid",
         placeItems: "center",
         fontWeight: 800,
-        fontSize: size * 0.38,
+        fontSize: size * (initial.length > 1 ? 0.34 : 0.38),
+        letterSpacing: "0.01em",
         fontFamily: "var(--font-display)",
         ...ringStyle,
       }}

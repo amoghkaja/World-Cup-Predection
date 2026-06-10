@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/queries";
+import { getCurrentUser, getLeaderboard } from "@/lib/queries";
 import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
@@ -9,12 +8,7 @@ import { LeaderboardRow } from "@/components/LeaderboardRow";
 export const dynamic = "force-dynamic";
 
 export default async function LeaderboardPage() {
-  const supabase = await createClient();
-  const [{ data }, user] = await Promise.all([
-    supabase.from("leaderboard").select("*").order("total_points", { ascending: false }),
-    getCurrentUser(),
-  ]);
-  const rows = (data ?? []) as LeaderboardRowData[];
+  const [rows, user] = await Promise.all([getLeaderboard(), getCurrentUser()]);
   const me = (r: LeaderboardRowData) => r.user_id === user?.id;
 
   const podium = rows.slice(0, 3);

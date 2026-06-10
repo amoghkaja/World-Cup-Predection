@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { getMatches, getMyPredictions, getProfile, getSetupStatus, tournamentLockAt } from "@/lib/queries";
+import {
+  getLeaderboard,
+  getMatches,
+  getMyPredictions,
+  getProfile,
+  getSetupStatus,
+  tournamentLockAt,
+} from "@/lib/queries";
 import { isLocked, serverNow } from "@/lib/format";
 import { DashboardMatchList } from "@/components/MatchCard";
 import { Icon } from "@/components/Icon";
@@ -17,12 +24,13 @@ function eyebrowDate(now: number): string {
 }
 
 export default async function DashboardPage() {
-  const [matches, preds, profile, setup, lockAt] = await Promise.all([
+  const [matches, preds, profile, setup, lockAt, board] = await Promise.all([
     getMatches(),
     getMyPredictions(),
     getProfile(),
     getSetupStatus(),
     tournamentLockAt(),
+    getLeaderboard(),
   ]);
   const now = serverNow();
 
@@ -39,9 +47,10 @@ export default async function DashboardPage() {
 
   const greetingName = profile?.display_name?.split(" ")[0] ?? "there";
 
+  const myIndex = board.findIndex((r) => r.user_id === profile?.id);
   const stats: { value: string; label: string; gold?: boolean }[] = [
-    { value: "—", label: "Rank" },
-    { value: "—", label: "Points" },
+    { value: myIndex >= 0 ? `#${myIndex + 1}` : "—", label: "Rank" },
+    { value: myIndex >= 0 ? String(board[myIndex].total_points) : "—", label: "Points" },
     { value: gated ? "—" : String(toPick), label: "To pick", gold: !gated && toPick > 0 },
   ];
 

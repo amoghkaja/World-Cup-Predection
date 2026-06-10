@@ -143,7 +143,10 @@
 
 * { box-sizing: border-box; border-color: var(--line); }
 
-html { height: 100%; }
+html { height: 100%; -webkit-tap-highlight-color: transparent; }
+
+/* Mobile: kill the double-tap-to-zoom delay so buttons respond instantly. */
+a, button, input, select, label { touch-action: manipulation; }
 
 body {
   background: var(--bg);
@@ -249,6 +252,18 @@ h1, h2, h3, h4 {
   .press { transition: transform .12s ease; }
   .press:active { transform: scale(.97); }
 }
+
+/* loading skeletons (route transitions) */
+.skel {
+  position: relative; overflow: hidden;
+  background: var(--surface-2); border-radius: var(--radius-sm);
+}
+.skel::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.4), transparent);
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
 
 /* motion */
 @keyframes livepulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.78); } }

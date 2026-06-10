@@ -270,7 +270,12 @@ export function DashboardMatchList({
               <div
                 key={m.id}
                 className="anim-up"
-                style={{ animationDelay: `${Math.min(0.06 * mi + 0.03 * di, 0.4)}s` }}
+                style={{
+                  animationDelay: `${Math.min(0.06 * mi + 0.03 * di, 0.4)}s`,
+                  // skip layout/paint for cards far offscreen (big mobile win)
+                  contentVisibility: "auto",
+                  containIntrinsicSize: "auto 190px",
+                }}
               >
                 <MatchCard match={m} prediction={predMap.get(m.id) ?? null} />
               </div>

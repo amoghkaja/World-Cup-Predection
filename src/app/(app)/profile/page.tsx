@@ -1,21 +1,14 @@
 import Link from "next/link";
-import { getProfile } from "@/lib/queries";
-import { createClient } from "@/lib/supabase/server";
-import type { LeaderboardRow } from "@/lib/types";
+import { getLeaderboard, getProfile } from "@/lib/queries";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
 import { ProfileEditor } from "@/components/ProfileEditor";
+import { AvatarToggle } from "@/components/AvatarToggle";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const profile = await getProfile();
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("leaderboard")
-    .select("*")
-    .order("total_points", { ascending: false });
-  const board = (data ?? []) as LeaderboardRow[];
+  const [profile, board] = await Promise.all([getProfile(), getLeaderboard()]);
 
   const myIndex = board.findIndex((r) => r.user_id === profile!.id);
   const my = myIndex >= 0 ? board[myIndex] : null;
@@ -47,7 +40,12 @@ export default async function ProfilePage() {
       <div className="card mb-[18px]" style={{ overflow: "hidden" }}>
         <div style={{ height: 88, background: "var(--brand-grad)" }} />
         <div style={{ padding: "0 20px 20px", marginTop: -38 }}>
-          <Avatar name={name} src={profile?.avatar_url} size={76} ring="var(--surface)" />
+          <Avatar
+            name={name}
+            src={profile?.hide_avatar ? null : profile?.avatar_url}
+            size={76}
+            ring="var(--surface)"
+          />
           <h1 className="t-h1" style={{ marginTop: 10 }}>
             {name}
           </h1>
@@ -132,7 +130,14 @@ export default async function ProfilePage() {
           <Icon name="edit" size={18} />
           <span className="t-h3">Edit profile</span>
         </div>
-        <ProfileEditor initialName={profile?.display_name ?? ""} />
+        <div className="flex flex-col gap-4">
+          <ProfileEditor initialName={profile?.display_name ?? ""} />
+          <AvatarToggle
+            name={name}
+            avatarUrl={profile?.avatar_url ?? null}
+            initialHidden={profile?.hide_avatar ?? false}
+          />
+        </div>
       </div>
 
       {/* sign out */}

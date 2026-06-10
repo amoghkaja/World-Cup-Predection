@@ -3,33 +3,34 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 
-const KEY = "wc_onboarded_v1";
+// v2: re-shown once to everyone after the guided-setup gate shipped.
+const KEY = "wc_onboarded_v2";
 
 const STEPS: { icon: string; title: string; body: string }[] = [
   {
     icon: "trophy",
     title: "Welcome to World Cup Pick'em",
-    body: "Predict the 2026 World Cup, earn points, and climb the leaderboard against your friends.",
+    body: "Predict the 2026 World Cup, earn points for every correct call, and climb the leaderboard against your friends.",
+  },
+  {
+    icon: "spark",
+    title: "Step one: your big calls",
+    body: "Before you can predict matches, a quick 3-step setup: pick 1st & 2nd in all 12 groups, name your Golden Boot (top scorer), and crown your champion. It takes two minutes — and these are your biggest points.",
   },
   {
     icon: "target",
-    title: "Predict every match",
-    body: "Call the exact score of each game. The correct result earns points; nailing the exact scoreline adds a bonus. Every pick locks at kickoff — and you can edit it any time before then.",
-  },
-  {
-    icon: "grid",
-    title: "Groups & the bracket",
-    body: "Call who finishes 1st and 2nd in each group, and build the knockout bracket round by round as the teams are confirmed.",
+    title: "Then predict every match",
+    body: "Call the result and exact score of each game. The right result earns points, the exact scoreline adds a bonus, and deeper rounds are worth more. Edit freely until kickoff — every time shown is in your local timezone.",
   },
   {
     icon: "medal",
-    title: "Podium & Golden Boot",
-    body: "Pick the top three — champion, runner-up and third place — plus the Golden Boot. Lock these in before the tournament starts to earn the most points.",
+    title: "The podium pays the most",
+    body: "Your champion, runner-up and third place lock at the first kickoff for the full reward. After the groups finish you get one chance to revise them — for slightly fewer points.",
   },
   {
     icon: "bolt",
-    title: "Climb the board",
-    body: "Every correct call adds up. Tap “How points work” any time to see the full scoring. Ready? Let's play.",
+    title: "Watch the board",
+    body: "Once a match kicks off, everyone's picks become visible — tap any player on the leaderboard to see theirs. Tap “How points work” any time for the full scoring. Ready? Let's play.",
   },
 ];
 
@@ -84,10 +85,17 @@ export function Onboarding() {
       <div
         onClick={(e) => e.stopPropagation()}
         className="card anim-pop"
-        style={{ maxWidth: 380, width: "100%", overflow: "hidden" }}
+        style={{
+          maxWidth: 380,
+          width: "100%",
+          overflow: "hidden",
+          maxHeight: "88dvh",
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        <div className="trirule" />
-        <div style={{ padding: "26px 22px 22px", textAlign: "center" }}>
+        <div className="trirule" style={{ flex: "none" }} />
+        <div style={{ padding: "26px 22px 22px", textAlign: "center", overflowY: "auto" }}>
           <div
             className="grid place-items-center mx-auto"
             style={{

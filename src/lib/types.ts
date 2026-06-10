@@ -84,6 +84,7 @@ export interface Profile {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
+  hide_avatar: boolean;
   is_admin: boolean;
   created_at: string;
 }

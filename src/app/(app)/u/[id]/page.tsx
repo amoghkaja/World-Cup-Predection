@@ -53,7 +53,11 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
       </Link>
 
       <div className="card flex items-center gap-3.5 mb-4" style={{ padding: "16px 18px" }}>
-        <Avatar name={profile.display_name ?? "?"} src={profile.avatar_url} size={56} />
+        <Avatar
+          name={profile.display_name ?? "?"}
+          src={profile.hide_avatar ? null : profile.avatar_url}
+          size={56}
+        />
         <div className="flex-1 min-w-0">
           <h1 className="t-h2 truncate">{profile.display_name ?? "Player"}</h1>
           <div className="t-sm" style={{ color: "var(--text-3)" }}>

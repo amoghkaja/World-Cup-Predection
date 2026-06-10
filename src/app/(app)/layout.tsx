@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Shell
         profile={{
           display_name: profile.display_name,
-          avatar_url: profile.avatar_url,
+          avatar_url: profile.hide_avatar ? null : profile.avatar_url,
           is_admin: profile.is_admin,
         }}
       >
