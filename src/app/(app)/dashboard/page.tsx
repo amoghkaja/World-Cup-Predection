@@ -42,6 +42,13 @@ export default async function DashboardPage() {
   const isOpen = (kickoffIso: string, status: string) =>
     !isLocked(kickoffIso, now) && status !== "final";
 
+  // Finished games move to Results & Tables — the home feed stays focused on
+  // what's still to play (live + upcoming).
+  const isFinished = (m: (typeof matches)[number]) =>
+    m.status === "final" && m.home_score != null;
+  const upcoming = matches.filter((m) => !isFinished(m));
+  const finishedCount = matches.length - upcoming.length;
+
   const openMatches = matches.filter((m) => isOpen(m.kickoff_at, m.status));
   const unpicked = openMatches.filter((m) => !preds.has(m.id));
   const toPick = unpicked.length;
@@ -245,12 +252,44 @@ export default async function DashboardPage() {
             </Link>
           )}
 
-          {/* filterable, day-grouped match list */}
+          {/* filterable, day-grouped match list (upcoming + live only) */}
           <DashboardMatchList
-            matches={matches}
+            matches={upcoming}
             predictions={[...preds.entries()]}
             toPickCount={toPick}
           />
+
+          {/* finished games live in Results & Tables */}
+          {finishedCount > 0 && (
+            <Link
+              href="/results"
+              className="card lift flex items-center gap-3"
+              style={{ padding: "13px 16px" }}
+            >
+              <span
+                className="grid place-items-center"
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 11,
+                  flex: "none",
+                  background: "var(--surface-2)",
+                  color: "var(--text-2)",
+                }}
+              >
+                <Icon name="table" size={18} />
+              </span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: "block", fontWeight: 700, fontSize: 14 }}>
+                  {finishedCount} match{finishedCount > 1 ? "es" : ""} played
+                </span>
+                <span className="t-xs" style={{ display: "block", color: "var(--text-3)" }}>
+                  Final scores, your points and live group tables
+                </span>
+              </span>
+              <Icon name="chevR" size={18} style={{ color: "var(--text-3)", flex: "none" }} />
+            </Link>
+          )}
         </>
       )}
     </div>
