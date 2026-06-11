@@ -36,19 +36,28 @@ export function GroupPicker({
     cbRef.current?.(complete);
   }, [complete]);
 
+  // Toast: brief bottom-of-screen confirmation so the save is visible no
+  // matter where the user has scrolled. The header pill stays "Saved" after.
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
   function persist(nextWinner: number | null, nextRunnerup: number | null) {
     setErr(null);
-    setSaved(false);
     start(async () => {
       const res = await saveGroupPrediction({
         groupLabel: group,
         winnerId: nextWinner,
         runnerupId: nextRunnerup,
       });
-      if (!res.ok) setErr(res.error);
-      else {
+      if (!res.ok) {
+        setErr(res.error);
+        setSaved(false);
+      } else {
         setSaved(true);
-        setTimeout(() => setSaved(false), 1600);
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setSaved(false), 1800);
       }
     });
   }
@@ -106,11 +115,6 @@ export function GroupPicker({
         </div>
         {pending ? (
           <span className="pill pill-locked">Saving…</span>
-        ) : saved ? (
-          <span className="pill pill-done">
-            <Icon name="check" size={12} sw={3} />
-            Saved
-          </span>
         ) : existing?.scored ? (
           <span className="pill pill-done">
             <Icon name="check" size={12} sw={3} />
@@ -119,8 +123,10 @@ export function GroupPicker({
         ) : complete ? (
           <span className="pill pill-done">
             <Icon name="check" size={12} sw={3} />
-            Set
+            Saved
           </span>
+        ) : winner != null || runnerup != null ? (
+          <span className="pill pill-open">1 of 2 picked</span>
         ) : (
           <span className="pill pill-open">Pick 1st &amp; 2nd</span>
         )}
@@ -169,6 +175,36 @@ export function GroupPicker({
         <p className="t-xs text-center" style={{ color: "var(--bad)", padding: "0 12px 12px" }}>
           {err}
         </p>
+      )}
+
+      {/* floating save confirmation — visible wherever the user is scrolled */}
+      {saved && !pending && (
+        <div
+          role="status"
+          className="anim-pop"
+          style={{
+            position: "fixed",
+            left: "50%",
+            transform: "translateX(-50%)",
+            bottom: "calc(78px + env(safe-area-inset-bottom))",
+            zIndex: 60,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            background: "var(--text)",
+            color: "var(--bg)",
+            borderRadius: 999,
+            padding: "9px 16px",
+            fontWeight: 700,
+            fontSize: 13.5,
+            boxShadow: "var(--shadow-lg)",
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+          }}
+        >
+          <Icon name="check" size={14} sw={3} style={{ color: "var(--good)" }} />
+          Group {group} saved
+        </div>
       )}
     </div>
   );
