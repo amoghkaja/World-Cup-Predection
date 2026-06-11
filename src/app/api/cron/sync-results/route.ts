@@ -27,6 +27,8 @@ const STAGE_MAP: Record<string, MatchStage> = {
   FINAL: "final",
 };
 const FINISHED = new Set(["FINISHED", "AWARDED"]);
+// Feed phases during which the game is on (docs lookup_tables: status enum).
+const LIVE = new Set(["IN_PLAY", "PAUSED", "EXTRA_TIME", "PENALTY_SHOOTOUT"]);
 
 interface FdTeam {
   id: number | null;
@@ -139,6 +141,7 @@ export async function GET(req: NextRequest) {
   const report = {
     timeUpdates: 0,
     teamsSet: 0,
+    statusUpdates: 0,
     applied: [] as number[],
     unresolved: new Set<string>(),
     unmatched: [] as string[],
@@ -185,6 +188,20 @@ export async function GET(req: NextRequest) {
         updates.status = "final";
         needRescore = true;
       }
+    }
+
+    // Mirror the feed's live phase. Status arrives promptly even on the free
+    // tier (only the scoreline is delayed), so LIVE/ended states in the UI are
+    // data-driven instead of guessed from kickoff time. FINISHED with a still-
+    // missing score also maps to "live" — settled only once numbers arrive.
+    if (
+      !finished &&
+      teamsKnown &&
+      our.status === "scheduled" &&
+      (LIVE.has(fx.status) || FINISHED.has(fx.status))
+    ) {
+      updates.status = "live";
+      report.statusUpdates++;
     }
 
     if (Object.keys(updates).length === 0) return;
@@ -296,7 +313,12 @@ export async function GET(req: NextRequest) {
 
   // Refresh the cached match list / leaderboard so pages pick the changes up
   // immediately instead of waiting out the revalidate window.
-  if (report.applied.length > 0 || report.teamsSet > 0 || report.timeUpdates > 0) {
+  if (
+    report.applied.length > 0 ||
+    report.teamsSet > 0 ||
+    report.timeUpdates > 0 ||
+    report.statusUpdates > 0
+  ) {
     revalidateTag(TAG_MATCHES, "max");
   }
   if (report.applied.length > 0) {
@@ -334,6 +356,7 @@ export async function GET(req: NextRequest) {
     appliedCount: report.applied.length,
     timeUpdates: report.timeUpdates,
     teamsSet: report.teamsSet,
+    statusUpdates: report.statusUpdates,
     playersImported,
     applied: report.applied,
     unresolvedTeams: [...report.unresolved],
