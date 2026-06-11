@@ -9,7 +9,10 @@ name: Sync match results
 
 on:
   schedule:
-    - cron: "*/30 * * * *" # every 30 minutes (GitHub may delay scheduled runs)
+    # Every 15 min, offset from :00/:30 — GitHub heavily delays runs scheduled
+    # at popular minutes (we saw 2–4h gaps on */30). This is only the backstop:
+    # the app also kicks its own sync whenever a match is in play (src/lib/autosync.ts).
+    - cron: "3,18,33,48 * * * *"
   workflow_dispatch: {}
 
 jobs:

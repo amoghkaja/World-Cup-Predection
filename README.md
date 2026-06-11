@@ -110,10 +110,17 @@ update public.profiles set is_admin = true where id = (
 
 `GET /api/cron/sync-results` (guarded by `CRON_SECRET`) makes a **single** call to football-data.org,
 updates real kickoff times, fills knockout teams as the bracket fills, applies final scores, and
-re-scores predictions. Trigger it from the included GitHub Action
-([`.github/workflows/sync-results.yml`](.github/workflows/sync-results.yml)) — set the `APP_URL` and
-`CRON_SECRET` repo secrets and re-enable its schedule. The free football-data.org tier (10 req/min)
-is plenty: one call returns all 104 matches.
+re-scores predictions. It runs two ways:
+
+- **Self-healing (primary):** while a match is in play, the app kicks its own sync in the
+  background (throttled to every 3 min) whenever someone opens the dashboard or results page —
+  finished scores and points land minutes after the data feed updates.
+- **Scheduled backstop:** the included GitHub Action
+  ([`.github/workflows/sync-results.yml`](.github/workflows/sync-results.yml)) — set the `APP_URL`
+  and `CRON_SECRET` repo secrets. Note GitHub can delay scheduled runs by hours, which is why the
+  in-app trigger exists. The free football-data.org tier (10 req/min) is plenty: one call returns
+  all 104 matches, and their feed can lag full-time by some minutes — `/admin/results` lets the
+  admin settle a match by hand instantly.
 
 ## ☁️ Deploy to Vercel
 

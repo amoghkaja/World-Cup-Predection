@@ -1,5 +1,6 @@
 import { getMatches, getTeams } from "@/lib/queries";
 import { groupStandings } from "@/lib/standings";
+import { maybeKickResultsSync } from "@/lib/autosync";
 import { ResultsExplorer } from "@/components/ResultsExplorer";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function ResultsPage() {
   const [teams, matches] = await Promise.all([getTeams(), getMatches()]);
   const standings = groupStandings(teams, matches);
+
+  // A kicked-off match without a result yet? Chase it (post-response).
+  maybeKickResultsSync(matches);
 
   return (
     <div className="mx-auto w-full flex flex-col" style={{ maxWidth: 860, gap: 14 }}>

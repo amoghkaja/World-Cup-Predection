@@ -8,6 +8,7 @@ import {
   tournamentLockAt,
 } from "@/lib/queries";
 import { isLocked, serverNow } from "@/lib/format";
+import { maybeKickResultsSync } from "@/lib/autosync";
 import { DashboardMatchList, type FeedMatch, type FeedPick } from "@/components/MatchCard";
 import { Icon } from "@/components/Icon";
 import { SetupChecklist } from "@/components/SetupChecklist";
@@ -25,6 +26,9 @@ export default async function DashboardPage() {
     getLeaderboard(),
   ]);
   const now = serverNow();
+
+  // A kicked-off match without a result yet? Chase it (post-response).
+  maybeKickResultsSync(matches);
 
   const setupLocked = lockAt ? isLocked(lockAt, now) : false;
   // Hard gate: until the pre-tournament picks are in, no match predictions.

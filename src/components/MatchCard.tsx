@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { MatchStage, MatchStatus, PredOutcome } from "@/lib/types";
-import { isLocked } from "@/lib/format";
+import { elapsedSince, isLocked } from "@/lib/format";
 import { Icon } from "./Icon";
 import { LocalDay, LocalKickoff } from "./LocalTime";
 import { Flag } from "./TeamBadge";
@@ -60,8 +60,13 @@ export function MatchRow({
   divider: boolean;
 }) {
   const locked = isLocked(m.kickoff);
-  const live = m.status === "live" || (locked && m.status === "scheduled");
   const open = !locked && m.status === "scheduled";
+  // No game realistically runs longer than this (group: 90' + stoppage;
+  // knockout: extra time + pens). Past it, the match has ended and we're just
+  // waiting on the results feed — saying LIVE would be a lie.
+  const maxLiveMs = (m.stage === "group" ? 150 : 195) * 60_000;
+  const ended = locked && m.status !== "final" && elapsedSince(m.kickoff, maxLiveMs);
+  const live = !ended && (m.status === "live" || (locked && m.status === "scheduled"));
   const [editing, setEditing] = useState(false);
 
   const teamLine = (t: FeedTeam | null, ph: string | null) => (
@@ -132,6 +137,10 @@ export function MatchRow({
             <span className="pill pill-live" style={{ fontSize: 10 }}>
               <span className="dot-live" />
               LIVE
+            </span>
+          ) : ended ? (
+            <span className="pill pill-locked" style={{ fontSize: 10 }}>
+              Ended
             </span>
           ) : (
             <span className="tnum" style={{ fontWeight: 700, fontSize: 13 }}>
