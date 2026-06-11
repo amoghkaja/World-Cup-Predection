@@ -18,6 +18,7 @@ const API = "https://api.football-data.org/v4/competitions/WC/matches";
 
 const STAGE_MAP: Record<string, MatchStage> = {
   GROUP_STAGE: "group",
+  LEAGUE_STAGE: "group", // football-data's label for new expanded formats
   LAST_32: "r32",
   LAST_16: "r16",
   QUARTER_FINALS: "qf",
@@ -305,6 +306,29 @@ export async function GET(req: NextRequest) {
     revalidateTag(TAG_PLAYERS, "max");
   }
 
+  // Feed diagnostics: what football-data is actually reporting right now —
+  // fixture counts per raw stage string, plus every fixture around "now".
+  // Lets the action logs answer "why didn't a result land?" definitively.
+  const stageCounts: Record<string, number> = {};
+  for (const fx of apiMatches) {
+    stageCounts[fx.stage] = (stageCounts[fx.stage] ?? 0) + 1;
+  }
+  const nowMs = Date.now();
+  const recent = apiMatches
+    .filter((fx) => {
+      const t = new Date(fx.utcDate).getTime();
+      return t > nowMs - 8 * 3600_000 && t < nowMs + 2 * 3600_000;
+    })
+    .map((fx) => ({
+      stage: fx.stage,
+      status: fx.status,
+      utc: fx.utcDate,
+      home: fx.homeTeam?.tla ?? fx.homeTeam?.name ?? "?",
+      away: fx.awayTeam?.tla ?? fx.awayTeam?.name ?? "?",
+      ft: fx.score.fullTime,
+      winner: fx.score.winner,
+    }));
+
   return NextResponse.json({
     ok: true,
     appliedCount: report.applied.length,
@@ -314,5 +338,6 @@ export async function GET(req: NextRequest) {
     applied: report.applied,
     unresolvedTeams: [...report.unresolved],
     unmatched: report.unmatched,
+    feed: { stageCounts, recent },
   });
 }
