@@ -1,5 +1,8 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
+import { TAG_LEADERBOARD, TAG_MATCHES, TAG_PLAYERS } from "@/lib/queries";
 import { scorePrediction } from "@/lib/scoring";
 import type { Match, MatchStage, Prediction, Team } from "@/lib/types";
 
@@ -52,11 +55,15 @@ function norm(s: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
+// Header-only, constant-time comparison. The secret is never accepted in the
+// query string (URLs end up in access logs).
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  if (req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  return new URL(req.url).searchParams.get("secret") === secret;
+  const header = req.headers.get("authorization") ?? "";
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const given = Buffer.from(header);
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 export async function GET(req: NextRequest) {
@@ -103,7 +110,7 @@ export async function GET(req: NextRequest) {
     return null;
   };
 
-  // Index our matches: group games by unordered team pair; everything by stage (ordered).
+  // Index our matches: by unordered team pair within a stage; and by stage (ordered).
   const pairKey = (stage: string, a: number, b: number) =>
     `${stage}|${Math.min(a, b)}-${Math.max(a, b)}`;
   const ourByPair = new Map<string, Match>();
@@ -193,14 +200,22 @@ export async function GET(req: NextRequest) {
     if (needRescore) {
       report.applied.push(our.id);
       const { data: preds } = await admin.from("predictions").select("*").eq("match_id", our.id);
-      for (const p of (preds ?? []) as Prediction[]) {
-        const pts = scorePrediction(p, updated as Match);
-        await admin.from("predictions").update({ points_awarded: pts, scored: true }).eq("id", p.id);
+      const rows = (preds ?? []) as Prediction[];
+      for (let i = 0; i < rows.length; i += 20) {
+        await Promise.all(
+          rows.slice(i, i + 20).map(async (p) => {
+            const pts = scorePrediction(p, updated as Match);
+            await admin
+              .from("predictions")
+              .update({ points_awarded: pts, scored: true })
+              .eq("id", p.id);
+          })
+        );
       }
     }
   }
 
-  // Group games: match by group + team pair.
+  // Group games: match by team pair.
   for (const fx of apiMatches) {
     if (STAGE_MAP[fx.stage] !== "group") continue;
     const homeId = resolve(fx.homeTeam);
@@ -216,13 +231,33 @@ export async function GET(req: NextRequest) {
     await applyMatch(our, fx, homeId, awayId);
   }
 
-  // Knockout: map by chronological order within each stage (teams fill in as they're drawn).
+  // Knockout: prefer matching by team pair (stable even if kickoff times move).
+  // Only rows that still lack teams fall back to chronological order — and a
+  // kickoff-time update on every sync keeps that order aligned with the API.
   for (const [stage, apiArr] of apiByStage) {
     if (stage === "group") continue;
-    const ourArr = ourByStage.get(stage) ?? [];
-    for (let i = 0; i < Math.min(ourArr.length, apiArr.length); i++) {
-      const fx = apiArr[i];
-      await applyMatch(ourArr[i], fx, resolve(fx.homeTeam), resolve(fx.awayTeam));
+    const usedOur = new Set<number>();
+    const orderFallback: FdMatch[] = [];
+
+    for (const fx of apiArr) {
+      const homeId = resolve(fx.homeTeam);
+      const awayId = resolve(fx.awayTeam);
+      const our =
+        homeId != null && awayId != null
+          ? ourByPair.get(pairKey(stage, homeId, awayId))
+          : undefined;
+      if (our) {
+        usedOur.add(our.id);
+        await applyMatch(our, fx, homeId, awayId);
+      } else {
+        orderFallback.push(fx);
+      }
+    }
+
+    const ourRemaining = (ourByStage.get(stage) ?? []).filter((m) => !usedOur.has(m.id));
+    for (let i = 0; i < Math.min(ourRemaining.length, orderFallback.length); i++) {
+      const fx = orderFallback[i];
+      await applyMatch(ourRemaining[i], fx, resolve(fx.homeTeam), resolve(fx.awayTeam));
     }
   }
 
@@ -256,6 +291,18 @@ export async function GET(req: NextRequest) {
       }
       playersImported = players.length;
     }
+  }
+
+  // Refresh the cached match list / leaderboard so pages pick the changes up
+  // immediately instead of waiting out the revalidate window.
+  if (report.applied.length > 0 || report.teamsSet > 0 || report.timeUpdates > 0) {
+    revalidateTag(TAG_MATCHES, "max");
+  }
+  if (report.applied.length > 0) {
+    revalidateTag(TAG_LEADERBOARD, "max");
+  }
+  if (playersImported > 0) {
+    revalidateTag(TAG_PLAYERS, "max");
   }
 
   return NextResponse.json({

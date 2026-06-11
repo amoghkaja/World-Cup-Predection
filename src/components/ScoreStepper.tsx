@@ -20,11 +20,12 @@ export function ScoreStepper({
       aria-label={dir < 0 ? "decrease score" : "increase score"}
       onClick={() => onChange(Math.max(0, Math.min(20, value + dir)))}
       style={{
-        width: 38,
-        height: 38,
+        // 44px — minimum comfortable touch target
+        width: 44,
+        height: 44,
         borderRadius: 12,
-        border: "1px solid var(--line)",
-        background: "var(--surface-2)",
+        border: "1px solid var(--line-strong)",
+        background: "var(--surface)",
         color: disabled ? "var(--text-3)" : "var(--text)",
         display: "grid",
         placeItems: "center",
@@ -36,12 +37,12 @@ export function ScoreStepper({
     </button>
   );
   return (
-    <div className="flex items-center" style={{ gap: 10 }}>
+    <div className="flex items-center" style={{ gap: 8 }}>
       {btn(-1, "minus")}
-      <div
+      <output
         className="tnum"
         style={{
-          width: 50,
+          width: 46,
           textAlign: "center",
           fontFamily: "var(--font-display)",
           fontWeight: 800,
@@ -50,7 +51,7 @@ export function ScoreStepper({
         }}
       >
         {value}
-      </div>
+      </output>
       {btn(1, "plus")}
     </div>
   );

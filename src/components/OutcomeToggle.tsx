@@ -22,13 +22,15 @@ export function OutcomeToggle({
   ];
   return (
     <div
+      role="radiogroup"
+      aria-label="Match outcome"
       style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr 1fr",
-        gap: 6,
+        gap: 5,
         background: "var(--surface-2)",
         padding: 4,
-        borderRadius: 14,
+        borderRadius: 12,
         border: "1px solid var(--line)",
       }}
     >
@@ -38,17 +40,19 @@ export function OutcomeToggle({
           <button
             key={o.k}
             type="button"
+            role="radio"
+            aria-checked={on}
             disabled={disabled}
             onClick={() => onChange(o.k)}
             style={{
               border: "none",
-              borderRadius: 10,
-              padding: "10px 6px",
-              fontWeight: 800,
+              borderRadius: 9,
+              minHeight: 42,
+              padding: "0 6px",
+              fontWeight: 700,
               fontSize: 14,
               background: on ? "var(--brand)" : "transparent",
               color: on ? "var(--on-brand)" : "var(--text-2)",
-              boxShadow: on ? "var(--shadow-sm)" : "none",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",

@@ -6,24 +6,13 @@ import type { MatchWithTeams } from "@/lib/types";
 import { STAGE_LABELS } from "@/lib/types";
 import { Flag } from "./TeamBadge";
 import { Icon } from "./Icon";
-import { LocalTime } from "./LocalTime";
+import { LocalDay, LocalKickoff } from "./LocalTime";
 import { Segmented } from "./Segmented";
 
 type View = "tables" | "matches";
 
-function dayKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
-function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
+// Stable (timezone-independent) day key; the visible label is localized.
+const dayKey = (iso: string) => iso.slice(0, 10);
 
 const isFinished = (m: MatchWithTeams) =>
   m.status === "final" && m.home_score != null && m.away_score != null;
@@ -91,13 +80,12 @@ export function ResultsExplorer({
             Live standings from final scores · tap a team for its matches · top two advance
           </p>
           <div className="grid md:grid-cols-2" style={{ gap: 13 }}>
-            {standings.map((g, gi) => (
+            {standings.map((g) => (
               <div
                 key={g.group}
-                className="card anim-up"
+                className="card"
                 style={{
                   overflow: "hidden",
-                  animationDelay: `${Math.min(gi * 0.04, 0.3)}s`,
                   contentVisibility: "auto",
                   containIntrinsicSize: "auto 240px",
                 }}
@@ -213,7 +201,7 @@ export function ResultsExplorer({
           {days.map(([k, ms]) => (
             <div key={k} className="flex flex-col" style={{ gap: 8 }}>
               <div className="t-label" style={{ color: "var(--text-3)" }}>
-                {dayLabel(ms[0].kickoff_at)}
+                <LocalDay iso={ms[0].kickoff_at} />
               </div>
               <div className="card" style={{ overflow: "hidden" }}>
                 {ms.map((m, i) => {
@@ -263,8 +251,8 @@ export function ResultsExplorer({
                           {m.home_score}–{m.away_score}
                         </span>
                       ) : (
-                        <span className="t-xs" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-                          <LocalTime iso={m.kickoff_at} />
+                        <span className="t-xs tnum" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
+                          <LocalKickoff iso={m.kickoff_at} />
                         </span>
                       )}
                       <span

@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/**
+ * Visitor-local date/time rendering without the "render a dash, then swap after
+ * mount" double-render: the server emits UTC text, and React patches the text
+ * to the visitor's timezone during hydration (suppressHydrationWarning on the
+ * text node only). One render, no layout shift, no effect.
+ */
 
-const FMT: Intl.DateTimeFormatOptions = {
+const FULL: Intl.DateTimeFormatOptions = {
   weekday: "short",
   month: "short",
   day: "numeric",
@@ -10,22 +15,28 @@ const FMT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
   timeZoneName: "short",
 };
+const TIME: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+const DAY: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
 
-/**
- * Renders a UTC timestamp in the visitor's own timezone. Server (and the first
- * client render) show a deterministic UTC version so hydration matches; once
- * mounted we switch to the browser's local zone.
- */
+function local(iso: string, fmt: Intl.DateTimeFormatOptions): string {
+  return new Date(iso).toLocaleString(undefined, fmt);
+}
+
+/** "Thu, Jun 11, 6:00 PM EDT" in the visitor's timezone. */
 export function LocalTime({ iso }: { iso: string }) {
-  const [local, setLocal] = useState<string | null>(null);
+  return <span suppressHydrationWarning>{local(iso, FULL)}</span>;
+}
 
-  useEffect(() => {
-    // Format in the browser's timezone, only after mount (avoids hydration mismatch).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLocal(new Date(iso).toLocaleString(undefined, FMT));
-  }, [iso]);
+/** Kickoff clock only, e.g. "6:00 PM" / "18:00" per locale. */
+export function LocalKickoff({ iso, className }: { iso: string; className?: string }) {
+  return (
+    <span suppressHydrationWarning className={className}>
+      {local(iso, TIME)}
+    </span>
+  );
+}
 
-  const fallback = new Date(iso).toLocaleString("en-US", { ...FMT, timeZone: "UTC" });
-
-  return <span suppressHydrationWarning>{local ?? fallback}</span>;
+/** Day label, e.g. "Thu, Jun 11", in the visitor's timezone. */
+export function LocalDay({ iso }: { iso: string }) {
+  return <span suppressHydrationWarning>{local(iso, DAY)}</span>;
 }

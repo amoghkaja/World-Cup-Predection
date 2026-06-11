@@ -1,12 +1,31 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { MatchWithTeams, PredOutcome, Prediction } from "@/lib/types";
+import type { MatchStage, PredOutcome } from "@/lib/types";
 import { savePrediction } from "@/app/actions";
 import { Icon } from "./Icon";
 import { Flag } from "./TeamBadge";
 import { ScoreStepper } from "./ScoreStepper";
 import { OutcomeToggle, type Outcome } from "./OutcomeToggle";
+
+/**
+ * Narrow shapes so callers (dashboard rows) can pass a slim payload instead of
+ * full DB rows. MatchWithTeams / Prediction satisfy these structurally.
+ */
+export type PredictableTeam = { name: string; code: string; flag_emoji: string | null };
+export type PredictableMatch = {
+  id: number;
+  stage: MatchStage;
+  home_team: PredictableTeam | null;
+  away_team: PredictableTeam | null;
+};
+export type ExistingPick = {
+  pred_home_score: number;
+  pred_away_score: number;
+  pred_outcome: PredOutcome;
+  scored: boolean;
+  points_awarded: number;
+};
 
 // outcome <-> toggle code mappings (db uses home/away/draw, toggle uses H/A/D)
 const toToggle = (o: PredOutcome): Outcome => (o === "home" ? "H" : o === "away" ? "A" : "D");
@@ -18,8 +37,8 @@ export function PredictionForm({
   compact,
   onSaved,
 }: {
-  match: MatchWithTeams;
-  existing: Prediction | null;
+  match: PredictableMatch;
+  existing: ExistingPick | null;
   locked: boolean;
   /** drawer (true) vs full match-detail surface (false) */
   compact?: boolean;
@@ -106,7 +125,7 @@ export function PredictionForm({
 
       <div
         className="flex items-center justify-center"
-        style={{ gap: compact ? 18 : 22, marginTop: compact ? 2 : 6 }}
+        style={{ gap: compact ? 16 : 22, marginTop: compact ? 2 : 6 }}
       >
         <div className="text-center">
           {!compact && <Flag flag={match.home_team?.flag_emoji} name={match.home_team?.name} />}
@@ -124,6 +143,7 @@ export function PredictionForm({
           />
         </div>
         <span
+          aria-hidden
           style={{
             fontFamily: "var(--font-display)",
             fontWeight: 800,
@@ -164,8 +184,9 @@ export function PredictionForm({
                 <button
                   key={side}
                   type="button"
+                  aria-pressed={on}
                   className={`btn ${on ? "btn-primary" : "btn-ghost"}`}
-                  style={{ padding: "8px 14px", fontSize: 13.5 }}
+                  style={{ padding: "0 14px", fontSize: 13.5 }}
                   onClick={() => setAdvancer(side)}
                 >
                   {team?.flag_emoji} {team?.code}
@@ -179,12 +200,12 @@ export function PredictionForm({
       {!locked && (
         <button
           className="btn btn-primary"
-          style={compact ? { width: "100%" } : { width: "100%", padding: 16, fontSize: 16 }}
+          style={{ width: "100%" }}
           onClick={submit}
           disabled={isPending || disabled}
         >
-          <Icon name="check" size={compact ? 17 : 19} sw={2.6} />
-          {isPending ? "Saving…" : existing ? "Update prediction" : compact ? "Save prediction" : "Lock in prediction"}
+          <Icon name="check" size={17} sw={2.6} />
+          {isPending ? "Saving…" : existing ? "Update prediction" : "Save prediction"}
         </button>
       )}
 
@@ -217,6 +238,7 @@ export function PredictionForm({
 
       {msg && (
         <p
+          role="status"
           className="t-xs text-center"
           style={{ color: msg.ok ? "var(--brand-strong)" : "var(--bad)" }}
         >

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
+import { Modal } from "./Modal";
 
 export interface RecapEntry {
   id: number;
@@ -79,106 +80,80 @@ export function PointsRecap({
   }
 
   return (
-    <div
-      onClick={close}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 90,
-        background: "rgba(0,0,0,0.55)",
-        display: "grid",
-        placeItems: "center",
-        padding: 18,
-        WebkitBackdropFilter: "blur(2px)",
-        backdropFilter: "blur(2px)",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card anim-pop"
-        style={{
-          maxWidth: 400,
-          width: "100%",
-          overflow: "hidden",
-          maxHeight: "88dvh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div className="trirule" style={{ flex: "none" }} />
-        <div style={{ padding: "22px 20px 20px", overflowY: "auto" }}>
-          <div className="text-center" style={{ marginBottom: 14 }}>
+    <Modal onClose={close} label="Results since your last visit" maxWidth={400}>
+      <div className="trirule" style={{ flex: "none" }} />
+      <div style={{ padding: "22px 20px 20px", overflowY: "auto" }}>
+        <div className="text-center" style={{ marginBottom: 14 }}>
+          <div
+            className="grid place-items-center mx-auto"
+            style={{
+              width: 54,
+              height: 54,
+              borderRadius: 16,
+              background: gained > 0 ? "var(--gold-soft)" : "var(--surface-2)",
+              color: gained > 0 ? "var(--gold-strong)" : "var(--text-3)",
+              marginBottom: 12,
+            }}
+          >
+            <Icon name={gained > 0 ? "bolt" : "target"} size={26} />
+          </div>
+          <h2 className="t-h2">
+            {gained > 0 ? `You banked +${gained} pts` : "Results are in"}
+          </h2>
+          <p className="t-sm" style={{ color: "var(--text-2)", marginTop: 4 }}>
+            {fresh.length} of your matches finished — you called {hits} of them right.
+          </p>
+        </div>
+
+        <div className="flex flex-col" style={{ gap: 6, marginBottom: 14 }}>
+          {shown.map((e) => (
             <div
-              className="grid place-items-center mx-auto"
+              key={e.id}
+              className="flex items-center"
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 18,
-                background: gained > 0 ? "var(--gold-soft)" : "var(--surface-2)",
-                color: gained > 0 ? "var(--gold-strong)" : "var(--text-3)",
-                marginBottom: 12,
+                gap: 8,
+                padding: "9px 12px",
+                borderRadius: 10,
+                background: "var(--surface-2)",
               }}
             >
-              <Icon name={gained > 0 ? "bolt" : "target"} size={28} />
-            </div>
-            <h2 className="t-h2">
-              {gained > 0 ? `You banked +${gained} pts` : "Results are in"}
-            </h2>
-            <p className="t-sm" style={{ color: "var(--text-2)", marginTop: 4 }}>
-              {fresh.length} of your matches finished — you called {hits} of them right.
-            </p>
-          </div>
-
-          <div className="flex flex-col" style={{ gap: 6, marginBottom: 14 }}>
-            {shown.map((e) => (
-              <div
-                key={e.id}
-                className="flex items-center"
+              <span className="tnum" style={{ fontWeight: 700, fontSize: 13.5 }}>
+                {e.homeFlag ?? ""} {e.home} {e.hs}–{e.as} {e.away} {e.awayFlag ?? ""}
+              </span>
+              <span className="t-xs tnum" style={{ color: "var(--text-3)", flex: 1 }}>
+                you said {e.ph}–{e.pa}
+              </span>
+              <span
+                className="tnum"
                 style={{
-                  gap: 8,
-                  padding: "9px 12px",
-                  borderRadius: 12,
-                  background: "var(--surface-2)",
+                  fontWeight: 800,
+                  fontSize: 13.5,
+                  whiteSpace: "nowrap",
+                  color: e.pts > 0 ? "var(--gold-strong)" : "var(--text-3)",
                 }}
               >
-                <span className="tnum" style={{ fontWeight: 800, fontSize: 13.5 }}>
-                  {e.homeFlag ?? ""} {e.home} {e.hs}–{e.as} {e.away} {e.awayFlag ?? ""}
-                </span>
-                <span className="t-xs tnum" style={{ color: "var(--text-3)", flex: 1 }}>
-                  you said {e.ph}–{e.pa}
-                </span>
-                <span
-                  className="tnum"
-                  style={{
-                    fontWeight: 800,
-                    fontSize: 13.5,
-                    whiteSpace: "nowrap",
-                    color: e.pts > 0 ? "var(--gold-strong)" : "var(--text-3)",
-                  }}
-                >
-                  {e.pts > 0 ? `+${e.pts}` : "0"}
-                </span>
-              </div>
-            ))}
-            {fresh.length > shown.length && (
-              <div className="t-xs text-center" style={{ color: "var(--text-3)" }}>
-                …and {fresh.length - shown.length} more
-              </div>
-            )}
-          </div>
-
-          <div
-            className="t-sm text-center"
-            style={{ color: "var(--text-2)", marginBottom: 14, fontWeight: 700 }}
-          >
-            You&rsquo;re on {totalPoints} pts{rank ? ` · #${rank} on the board` : ""}
-          </div>
-
-          <button type="button" className="btn btn-primary w-full" onClick={close}>
-            {gained > 0 ? "Keep it rolling" : "On to the next one"}
-          </button>
+                {e.pts > 0 ? `+${e.pts}` : "0"}
+              </span>
+            </div>
+          ))}
+          {fresh.length > shown.length && (
+            <div className="t-xs text-center" style={{ color: "var(--text-3)" }}>
+              …and {fresh.length - shown.length} more
+            </div>
+          )}
         </div>
+
+        <div
+          className="t-sm text-center"
+          style={{ color: "var(--text-2)", marginBottom: 14, fontWeight: 650 }}
+        >
+          You&rsquo;re on {totalPoints} pts{rank ? ` · #${rank} on the board` : ""}
+        </div>
+
+        <button type="button" className="btn btn-primary w-full" onClick={close}>
+          Continue
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }

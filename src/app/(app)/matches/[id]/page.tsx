@@ -198,15 +198,12 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* points hint (gold) */}
-      <div
-        className="card"
-        style={{ padding: 18, background: "var(--gold-soft)", border: "1px solid transparent" }}
-      >
+      {/* points on offer */}
+      <div className="card" style={{ padding: 18 }}>
         <div className="flex items-center" style={{ gap: 10, marginBottom: 12 }}>
-          <Icon name="bolt" size={20} style={{ color: "var(--gold-strong)" }} />
-          <div className="t-h3" style={{ color: "var(--on-gold)" }}>
-            Up to {maxPts} pts on offer
+          <Icon name="bolt" size={19} style={{ color: "var(--gold-strong)" }} />
+          <div className="t-h3">
+            Up to <span style={{ color: "var(--gold-strong)" }}>{maxPts} pts</span> on offer
           </div>
         </div>
         <div className="flex flex-col" style={{ gap: 8 }}>
@@ -217,41 +214,22 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             <div
               key={l}
               className="flex justify-between"
-              style={{ fontSize: 14, color: "var(--on-gold)" }}
+              style={{ fontSize: 14, color: "var(--text-2)" }}
             >
-              <span style={{ opacity: 0.85 }}>{l}</span>
-              <b className="tnum">{r}</b>
+              <span>{l}</span>
+              <b className="tnum" style={{ color: "var(--text)" }}>
+                {r}
+              </b>
             </div>
           ))}
         </div>
-        <div
-          className="t-xs flex"
-          style={{ color: "var(--on-gold)", opacity: 0.8, marginTop: 12, gap: 6, alignItems: "flex-start" }}
-        >
-          <Icon name="lock" size={13} style={{ marginTop: 1, flex: "none" }} />
-          Your prediction locks the instant the match kicks off — no edits after that.
-        </div>
         <Link
           href="/scoring"
-          className="press"
-          style={{
-            marginTop: 12,
-            width: "100%",
-            borderRadius: 12,
-            background: "var(--on-gold)",
-            color: "var(--gold-soft)",
-            padding: "10px",
-            fontWeight: 800,
-            fontSize: 13.5,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 7,
-          }}
+          className="t-sm inline-flex items-center"
+          style={{ marginTop: 14, color: "var(--brand-strong)", fontWeight: 650, gap: 4 }}
         >
-          <Icon name="spark" size={15} />
-          How points work
-          <Icon name="chevR" size={15} />
+          How scoring works
+          <Icon name="chevR" size={14} />
         </Link>
       </div>
     </div>

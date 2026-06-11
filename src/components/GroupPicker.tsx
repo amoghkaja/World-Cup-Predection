@@ -140,9 +140,9 @@ export function GroupPicker({
               key={t.id}
               className="grid items-center"
               style={{
-                gridTemplateColumns: "1fr 54px 54px",
+                gridTemplateColumns: "1fr 56px 56px",
                 gap: 6,
-                padding: "5px 6px",
+                padding: "3px 6px",
                 borderRadius: 10,
                 background: isFirst || isSecond ? "var(--brand-soft)" : "transparent",
               }}
@@ -196,7 +196,7 @@ function PosToggle({
       onClick={onClick}
       className="inline-flex items-center justify-center gap-1"
       style={{
-        height: 34,
+        height: 42,
         borderRadius: 10,
         border: on ? "none" : "1.5px solid var(--line-strong)",
         background: on ? (gold ? "var(--gold)" : "var(--brand)") : "transparent",

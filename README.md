@@ -3,7 +3,7 @@
 A multi-user prediction game for the **FIFA World Cup 2026** (48 teams, 104 matches). Sign in
 with Google, predict every match score, build the knockout bracket, call group qualifiers, and
 pick the podium + Golden Boot. Predictions **lock at kickoff**, results sync automatically, and
-you climb a friends leaderboard. Mobile-first, with light **and** dark themes.
+you climb a friends leaderboard. Mobile-first; light and dark themes follow the system setting.
 
 Built with **Next.js 16 + TypeScript + Tailwind CSS v4**, **Supabase** (Postgres + Google Auth +
 Row-Level Security), live results from **football-data.org**, and deployed free on **Vercel**.
@@ -70,6 +70,9 @@ npm install
    - `supabase/migrations/0003_scoring_redesign.sql`  *(podium table + leaderboard)*
    - `supabase/migrations/0004_security_hardening.sql`  *(locks down self-scoring / admin escalation)*
    - `supabase/migrations/0005_fix_2026_teams.sql`  *(real 2026 draw)*
+   - `supabase/migrations/0006_players.sql`  *(Golden Boot player list)*
+   - `supabase/migrations/0007_grants_fix_and_avatar_privacy.sql`  *(critical column grants + avatar privacy)*
+   - `supabase/migrations/0008_tournament_pred_unique.sql`  *(one pick per type, race-proof)*
 3. **Authentication → Sign In / Providers → Google → Enable.** Create a Web OAuth client in the
    [Google Cloud Console](https://console.cloud.google.com/apis/credentials), set the redirect URI
    to `https://<project>.supabase.co/auth/v1/callback`, and paste the client ID/secret into Supabase.

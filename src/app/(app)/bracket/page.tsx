@@ -115,7 +115,7 @@ export default async function BracketPage() {
                   className="t-xs"
                   style={{ color: "var(--on-gold)", opacity: 0.8, marginTop: 4 }}
                 >
-                  70 pts if they lift it
+                  World champions
                 </div>
               )}
             </div>

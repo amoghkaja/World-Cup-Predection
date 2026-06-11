@@ -8,7 +8,7 @@ function hueFromString(s: string): number {
 
 export function Avatar({
   name,
-  src,
+  src: rawSrc,
   size = 40,
   ring,
 }: {
@@ -18,6 +18,8 @@ export function Avatar({
   ring?: string;
 }) {
   const ringStyle = ring ? { boxShadow: `0 0 0 3px var(--surface), 0 0 0 5px ${ring}` } : {};
+  // avatar_url is user-writable — only ever render https image sources.
+  const src = rawSrc && /^https:\/\//i.test(rawSrc) ? rawSrc : null;
   if (src) {
     return (
       // eslint-disable-next-line @next/next/no-img-element

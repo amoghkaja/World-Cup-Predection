@@ -8,21 +8,12 @@ import {
   tournamentLockAt,
 } from "@/lib/queries";
 import { isLocked, serverNow } from "@/lib/format";
-import { DashboardMatchList } from "@/components/MatchCard";
+import { DashboardMatchList, type FeedMatch, type FeedPick } from "@/components/MatchCard";
 import { Icon } from "@/components/Icon";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
 
 export const dynamic = "force-dynamic";
-
-// stable "Mon, Jun 9" style eyebrow date
-function eyebrowDate(now: number): string {
-  return new Date(now).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export default async function DashboardPage() {
   const [matches, preds, profile, setup, lockAt, board] = await Promise.all([
@@ -58,6 +49,36 @@ export default async function DashboardPage() {
     (m) => new Date(m.kickoff_at).getTime() - now < 24 * 3600 * 1000
   );
 
+  // Slim feed payload — full DB rows ×104 made the RSC stream several times
+  // bigger than it needed to be on mobile.
+  const feed: FeedMatch[] = upcoming.map((m) => ({
+    id: m.id,
+    stage: m.stage,
+    group: m.group_label,
+    kickoff: m.kickoff_at,
+    status: m.status,
+    home: m.home_team
+      ? { name: m.home_team.name, code: m.home_team.code, flag: m.home_team.flag_emoji }
+      : null,
+    away: m.away_team
+      ? { name: m.away_team.name, code: m.away_team.code, flag: m.away_team.flag_emoji }
+      : null,
+    homePh: m.home_placeholder,
+    awayPh: m.away_placeholder,
+  }));
+  const picks: [number, FeedPick][] = [...preds.values()]
+    .filter((p) => upcoming.some((m) => m.id === p.match_id))
+    .map((p) => [
+      p.match_id,
+      {
+        h: p.pred_home_score,
+        a: p.pred_away_score,
+        outcome: p.pred_outcome,
+        pts: p.points_awarded,
+        scored: p.scored,
+      },
+    ]);
+
   // "While you were away" recap: every settled match the player had a pick on.
   // The client only surfaces ones it hasn't shown before.
   const recap: RecapEntry[] = matches
@@ -86,8 +107,6 @@ export default async function DashboardPage() {
       };
     });
 
-  const greetingName = profile?.display_name?.split(" ")[0] ?? "there";
-
   const my = board.find((r) => r.user_id === profile?.id);
   const stats: { value: string; label: string; gold?: boolean }[] = [
     { value: my ? `#${my.rank}` : "—", label: "Rank" },
@@ -96,44 +115,36 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="flex flex-col" style={{ gap: 18 }}>
+    <div className="flex flex-col" style={{ gap: 16 }}>
       <PointsRecap
         entries={recap}
         totalPoints={my?.total_points ?? 0}
         rank={my?.rank ?? null}
       />
-      {/* greeting + stat band */}
-      <div className="flex flex-wrap items-center justify-between" style={{ gap: 14 }}>
-        <div>
-          <div className="t-label" style={{ color: "var(--text-3)" }}>
-            Matchday · {eyebrowDate(now)}
-          </div>
-          <h1 className="t-h1" style={{ marginTop: 4 }}>
-            Hey {greetingName}
-          </h1>
-        </div>
-        <div
-          className="card flex"
-          style={{ padding: "10px 4px", boxShadow: "none", background: "var(--surface-2)" }}
-        >
+
+      {/* header: title + stat strip */}
+      <div className="flex flex-wrap items-center justify-between" style={{ gap: 12 }}>
+        <h1 className="t-h1">Matches</h1>
+        <div className="card flex" style={{ padding: "8px 2px" }}>
           {stats.map((s, i) => (
             <div
               key={s.label}
               className="text-center"
-              style={{ padding: "0 18px", borderLeft: i ? "1px solid var(--line)" : "none" }}
+              style={{ padding: "0 16px", borderLeft: i ? "1px solid var(--line)" : "none" }}
             >
               <div
                 className="tnum"
                 style={{
                   fontFamily: "var(--font-display)",
                   fontWeight: 800,
-                  fontSize: 22,
+                  fontStretch: "108%",
+                  fontSize: 20,
                   color: s.gold ? "var(--gold-strong)" : "var(--text)",
                 }}
               >
                 {s.value}
               </div>
-              <div className="t-xs" style={{ color: "var(--text-3)" }}>
+              <div className="t-xs" style={{ color: "var(--text-3)", fontSize: 11 }}>
                 {s.label}
               </div>
             </div>
@@ -150,13 +161,13 @@ export default async function DashboardPage() {
             goldenSet={setup.goldenSet}
             goldenRequired={setup.goldenRequired}
           />
-          <div className="card flex items-center gap-3" style={{ padding: "16px 18px" }}>
+          <div className="card flex items-center gap-3" style={{ padding: "14px 16px" }}>
             <span
               className="grid place-items-center"
               style={{
                 width: 38,
                 height: 38,
-                borderRadius: 11,
+                borderRadius: 10,
                 flex: "none",
                 background: "var(--surface-2)",
                 color: "var(--text-3)",
@@ -174,104 +185,76 @@ export default async function DashboardPage() {
         </>
       ) : (
         <>
-          {/* champion call-to-action */}
-          <Link
-            href="/tournament"
-            className="lift"
-            style={{
-              textAlign: "left",
-              background: "var(--brand-grad)",
-              color: "var(--on-deep)",
-              borderRadius: "var(--radius)",
-              padding: "16px 18px",
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              boxShadow: "var(--shadow-md)",
-            }}
-          >
-            <span
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 13,
-                background: "var(--gold)",
-                color: "var(--on-gold)",
-                display: "grid",
-                placeItems: "center",
-                flex: "none",
-              }}
-            >
-              <Icon name="trophy" size={24} />
-            </span>
-            <span style={{ flex: 1 }}>
-              <span style={{ display: "block", fontWeight: 800, fontSize: 16 }}>
-                Review your tournament picks
-              </span>
-              <span className="t-sm" style={{ display: "block", opacity: 0.85 }}>
-                Podium &amp; Golden Boot lock at first kickoff — change them while you can.
-              </span>
-            </span>
-            <Icon name="chevR" size={22} style={{ opacity: 0.9, flex: "none" }} />
-          </Link>
-
-          {/* picks-due reminder */}
-          {soon.length > 0 && (
+          {/* pre-tournament: review the big calls while they're open */}
+          {!setupLocked && (
             <Link
-              href={`/matches/${soon[0].id}`}
-              className="card lift flex items-center gap-3"
-              style={{
-                padding: "14px 16px",
-                background: "var(--gold-soft)",
-                border: "1px solid transparent",
-              }}
+              href="/tournament"
+              className="card lift flex items-center"
+              style={{ padding: "13px 16px", gap: 12 }}
             >
               <span
                 className="grid place-items-center"
                 style={{
-                  width: 38,
-                  height: 38,
+                  width: 40,
+                  height: 40,
                   borderRadius: 11,
                   flex: "none",
-                  background: "var(--gold)",
-                  color: "var(--on-gold)",
+                  background: "var(--gold-soft)",
+                  color: "var(--gold-strong)",
                 }}
               >
-                <Icon name="bolt" size={19} />
+                <Icon name="trophy" size={21} />
               </span>
-              <span style={{ flex: 1, color: "var(--on-gold)" }}>
-                <span style={{ display: "block", fontWeight: 800, fontSize: 14.5 }}>
-                  {soon.length} match{soon.length > 1 ? "es" : ""} lock
-                  {soon.length === 1 ? "s" : ""} within 24 hours
+              <span style={{ flex: 1 }}>
+                <span style={{ display: "block", fontWeight: 700, fontSize: 14.5 }}>
+                  Review your tournament picks
                 </span>
-                <span className="t-xs" style={{ display: "block", opacity: 0.8 }}>
-                  No pick = no points — get yours in before kickoff.
+                <span className="t-xs" style={{ display: "block", color: "var(--text-3)" }}>
+                  Podium &amp; Golden Boot lock at the first kickoff
                 </span>
               </span>
-              <Icon name="chevR" size={18} style={{ color: "var(--on-gold)", flex: "none" }} />
+              <Icon name="chevR" size={18} style={{ color: "var(--text-3)", flex: "none" }} />
             </Link>
           )}
 
+          {/* picks-due reminder */}
+          {soon.length > 0 && (
+            <div
+              className="flex items-center"
+              style={{
+                padding: "12px 16px",
+                gap: 12,
+                borderRadius: "var(--radius)",
+                background: "var(--gold-soft)",
+                color: "var(--on-gold)",
+              }}
+            >
+              <Icon name="bolt" size={19} style={{ flex: "none", color: "var(--gold-strong)" }} />
+              <span style={{ flex: 1, fontSize: 13.5 }}>
+                <b>
+                  {soon.length} match{soon.length > 1 ? "es" : ""} without a pick
+                </b>{" "}
+                lock{soon.length === 1 ? "s" : ""} within 24 hours.
+              </span>
+            </div>
+          )}
+
           {/* filterable, day-grouped match list (upcoming + live only) */}
-          <DashboardMatchList
-            matches={upcoming}
-            predictions={[...preds.entries()]}
-            toPickCount={toPick}
-          />
+          <DashboardMatchList matches={feed} picks={picks} toPickCount={toPick} />
 
           {/* finished games live in Results & Tables */}
           {finishedCount > 0 && (
             <Link
               href="/results"
               className="card lift flex items-center gap-3"
-              style={{ padding: "13px 16px" }}
+              style={{ padding: "12px 16px" }}
             >
               <span
                 className="grid place-items-center"
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: 11,
+                  borderRadius: 10,
                   flex: "none",
                   background: "var(--surface-2)",
                   color: "var(--text-2)",

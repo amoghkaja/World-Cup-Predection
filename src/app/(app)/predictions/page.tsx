@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getMatches, getMyPredictions } from "@/lib/queries";
 import type { MatchWithTeams, Prediction } from "@/lib/types";
 import { Icon } from "@/components/Icon";
+import { LocalDay } from "@/components/LocalTime";
 import { CompactPredictionRow } from "@/components/CompactPredictionRow";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +21,6 @@ function isSettled(m: MatchWithTeams): boolean {
 // Stable day key (UTC date) used for grouping + sorting newest-first.
 function dayKey(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10);
-}
-function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 export default async function PredictionsPage({
@@ -148,7 +142,7 @@ export default async function PredictionsPage({
       {days.map(([k, items]) => (
         <div key={k} className="mb-[18px]">
           <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
-            {dayLabel(items[0].match.kickoff_at)}
+            <LocalDay iso={items[0].match.kickoff_at} />
           </div>
           <div className="card" style={{ overflow: "hidden" }}>
             {items.map((item, i) => (

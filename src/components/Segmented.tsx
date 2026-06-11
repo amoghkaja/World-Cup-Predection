@@ -1,6 +1,6 @@
 "use client";
 
-// Segmented control matching the design's .seg / .seg-btn primitives.
+// Segmented filter control.
 export function Segmented<T extends string>({
   options,
   value,
@@ -11,11 +11,13 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="seg">
+    <div className="seg" role="tablist">
       {options.map((o) => (
         <button
           key={o.key}
           type="button"
+          role="tab"
+          aria-selected={value === o.key}
           className={`seg-btn ${value === o.key ? "on" : ""}`}
           onClick={() => onChange(o.key)}
         >

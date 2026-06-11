@@ -1,7 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import {
+  getMatch,
+  getTeams,
+  tournamentLockAt,
+  TAG_LEADERBOARD,
+  TAG_MATCHES,
+} from "@/lib/queries";
+import { isLocked } from "@/lib/format";
 import {
   scorePrediction,
   scorePodium,
@@ -14,19 +22,36 @@ type Result<T = void> = { ok: true; data?: T } | { ok: false; error: string };
 
 async function requireUser() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in");
-  return { supabase, user };
+  const { data, error } = await supabase.auth.getClaims();
+  const sub = data?.claims?.sub;
+  if (error || !sub) throw new Error("Not signed in");
+  return { supabase, userId: sub };
 }
 
 async function requireAdmin() {
-  const { supabase, user } = await requireUser();
-  const { data } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  const { supabase, userId } = await requireUser();
+  const { data } = await supabase.from("profiles").select("is_admin").eq("id", userId).single();
   if (!data?.is_admin) throw new Error("Admin only");
-  return { user };
+  return { userId };
 }
+
+/** Run row updates a few at a time instead of strictly one-by-one. */
+async function inChunks<T>(items: T[], fn: (item: T) => Promise<unknown>, size = 20) {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(fn));
+  }
+}
+
+const isIntIn = (v: unknown, min: number, max: number): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
+
+/** Accent/case-insensitive name key: "José Martínez " → "josemartinez". */
+const nameKey = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 
 // ---------------- Match predictions ----------------
 export async function savePrediction(input: {
@@ -36,21 +61,38 @@ export async function savePrediction(input: {
   awayScore: number;
 }): Promise<Result> {
   try {
-    const { supabase, user } = await requireUser();
+    const { supabase, userId } = await requireUser();
 
-    const home = Math.max(0, Math.min(20, Math.round(input.homeScore)));
-    const away = Math.max(0, Math.min(20, Math.round(input.awayScore)));
-    if (!["home", "away", "draw"].includes(input.outcome)) {
-      return { ok: false, error: "Invalid outcome" };
+    if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
+    if (!isIntIn(input.homeScore, 0, 20) || !isIntIn(input.awayScore, 0, 20)) {
+      return { ok: false, error: "Scores must be between 0 and 20." };
     }
+    const home = input.homeScore;
+    const away = input.awayScore;
+
+    const match = await getMatch(input.matchId);
+    if (!match) return { ok: false, error: "Match not found" };
+    // Friendly pre-check; RLS enforces the same deadline authoritatively.
+    if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
+      return { ok: false, error: "This match is locked — the deadline has passed." };
+    }
+
+    // Derive the outcome from the scoreline so the pair can never disagree.
+    // A level knockout still needs the player's advancer call.
+    let outcome: PredOutcome;
+    if (home > away) outcome = "home";
+    else if (away > home) outcome = "away";
+    else if (match.stage === "group") outcome = "draw";
+    else if (input.outcome === "home" || input.outcome === "away") outcome = input.outcome;
+    else return { ok: false, error: "Pick who advances after a draw." };
 
     const { error } = await supabase.from("predictions").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         match_id: input.matchId,
         pred_home_score: home,
         pred_away_score: away,
-        pred_outcome: input.outcome,
+        pred_outcome: outcome,
         submitted_at: new Date().toISOString(),
       },
       { onConflict: "user_id,match_id" }
@@ -80,13 +122,29 @@ export async function saveGroupPrediction(input: {
   runnerupId: number | null;
 }): Promise<Result> {
   try {
-    const { supabase, user } = await requireUser();
-    if (input.winnerId && input.winnerId === input.runnerupId) {
+    const { supabase, userId } = await requireUser();
+
+    if (typeof input.groupLabel !== "string" || !/^[A-L]$/.test(input.groupLabel)) {
+      return { ok: false, error: "Invalid group" };
+    }
+    if (input.winnerId != null && input.winnerId === input.runnerupId) {
       return { ok: false, error: "Winner and runner-up must be different teams." };
     }
+    // Both picks must be teams that actually play in this group.
+    const teams = await getTeams();
+    const inGroup = (id: number | null) =>
+      id == null || teams.some((t) => t.id === id && t.group_label === input.groupLabel);
+    if (!inGroup(input.winnerId) || !inGroup(input.runnerupId)) {
+      return { ok: false, error: "Pick teams from this group." };
+    }
+    const lockAt = await tournamentLockAt();
+    if (lockAt && isLocked(lockAt)) {
+      return { ok: false, error: "Group picks locked at the first kickoff." };
+    }
+
     const { error } = await supabase.from("group_predictions").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         group_label: input.groupLabel,
         pred_winner_team_id: input.winnerId,
         pred_runnerup_team_id: input.runnerupId,
@@ -96,28 +154,41 @@ export async function saveGroupPrediction(input: {
     );
     if (error) return { ok: false, error: error.message };
     revalidatePath("/groups");
+    revalidatePath("/setup");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
 }
 
-// ---------------- Tournament predictions (champion etc.) ----------------
+// ---------------- Tournament predictions (golden boot etc.) ----------------
 export async function saveTournamentPrediction(input: {
   type: "champion" | "finalist" | "golden_boot";
   teamId: number | null;
   textValue?: string | null;
 }): Promise<Result> {
   try {
-    const { supabase, user } = await requireUser();
+    const { supabase, userId } = await requireUser();
+
+    if (!["champion", "finalist", "golden_boot"].includes(input.type)) {
+      return { ok: false, error: "Invalid pick type" };
+    }
+    const lockAt = await tournamentLockAt();
+    if (lockAt && isLocked(lockAt)) {
+      return { ok: false, error: "Locked at the first kickoff." };
+    }
+
+    const text = typeof input.textValue === "string" ? input.textValue.trim().slice(0, 80) : null;
 
     // Golden Boot must be a real player from the squad list (when we have one) —
     // the picker enforces this in the UI, this enforces it against direct calls.
-    if (input.type === "golden_boot" && input.textValue?.trim()) {
+    if (input.type === "golden_boot" && text) {
+      // Escape ilike wildcards so "%" can't match an arbitrary player.
+      const pattern = text.replace(/[\\%_]/g, "\\$&");
       const { data: hit } = await supabase
         .from("players")
         .select("id")
-        .ilike("name", input.textValue.trim())
+        .ilike("name", pattern)
         .limit(1)
         .maybeSingle();
       if (!hit) {
@@ -130,22 +201,50 @@ export async function saveTournamentPrediction(input: {
       }
     }
 
-    // single champion pick: clear previous of same type first
-    await supabase
-      .from("tournament_predictions")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("type", input.type);
-
-    const { error } = await supabase.from("tournament_predictions").insert({
-      user_id: user.id,
-      type: input.type,
-      team_id: input.teamId,
-      text_value: input.textValue ?? null,
-      submitted_at: new Date().toISOString(),
-    });
+    // Atomic single-pick-per-type write (unique (user_id, type) from migration
+    // 0008) — the old delete-then-insert could race into duplicate picks.
+    const { error } = await supabase.from("tournament_predictions").upsert(
+      {
+        user_id: userId,
+        type: input.type,
+        team_id: input.teamId,
+        text_value: text,
+        submitted_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,type" }
+    );
     if (error) return { ok: false, error: error.message };
     revalidatePath("/tournament");
+    revalidatePath("/setup");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------- Podium (top-3) predictions ----------------
+export async function savePodiumPick(input: {
+  position: PodiumPosition;
+  teamId: number | null;
+}): Promise<Result> {
+  try {
+    const { supabase } = await requireUser();
+    if (![1, 2, 3].includes(input.position)) return { ok: false, error: "Invalid position" };
+    if (input.teamId != null && !isIntIn(input.teamId, 1, 100000)) {
+      return { ok: false, error: "Invalid team" };
+    }
+    // All podium writes go through a SECURITY DEFINER function that enforces the
+    // two-window rule and computes original/revised server-side. Users can't write
+    // the table directly (migration 0004 revokes it), so the early/late value and
+    // the "revised" flag can't be forged.
+    const { error } = await supabase.rpc("save_podium_pick", {
+      p_position: input.position,
+      p_team_id: input.teamId,
+    });
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/tournament");
+    revalidatePath("/setup");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -157,14 +256,14 @@ export async function saveTournamentPrediction(input: {
 // leaderboard view, server-side) sees initials instead.
 export async function setAvatarHidden(hidden: boolean): Promise<Result> {
   try {
-    const { supabase, user } = await requireUser();
+    const { supabase, userId } = await requireUser();
     const { error } = await supabase
       .from("profiles")
-      .update({ hide_avatar: hidden })
-      .eq("id", user.id);
+      .update({ hide_avatar: !!hidden })
+      .eq("id", userId);
     if (error) return { ok: false, error: error.message };
+    updateTag(TAG_LEADERBOARD);
     revalidatePath("/profile");
-    revalidatePath("/leaderboard");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -173,16 +272,16 @@ export async function setAvatarHidden(hidden: boolean): Promise<Result> {
 
 export async function updateDisplayName(name: string): Promise<Result> {
   try {
-    const { supabase, user } = await requireUser();
-    const clean = name.trim().slice(0, 40);
+    const { supabase, userId } = await requireUser();
+    const clean = String(name).replace(/\s+/g, " ").trim().slice(0, 40);
     if (!clean) return { ok: false, error: "Name cannot be empty" };
     const { error } = await supabase
       .from("profiles")
       .update({ display_name: clean })
-      .eq("id", user.id);
+      .eq("id", userId);
     if (error) return { ok: false, error: error.message };
+    updateTag(TAG_LEADERBOARD);
     revalidatePath("/profile");
-    revalidatePath("/leaderboard");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -200,15 +299,44 @@ export async function saveMatchResult(input: {
     await requireAdmin();
     const admin = createAdminClient();
 
-    const home = Math.max(0, Math.round(input.homeScore));
-    const away = Math.max(0, Math.round(input.awayScore));
+    if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
+    if (!isIntIn(input.homeScore, 0, 99) || !isIntIn(input.awayScore, 0, 99)) {
+      return { ok: false, error: "Invalid score" };
+    }
+    const home = input.homeScore;
+    const away = input.awayScore;
+
+    const { data: current } = await admin
+      .from("matches")
+      .select("*")
+      .eq("id", input.matchId)
+      .single();
+    if (!current) return { ok: false, error: "Match not found" };
+    const m = current as Match;
+    if (m.home_team_id == null || m.away_team_id == null) {
+      return { ok: false, error: "Set the teams first." };
+    }
+
+    // Winner: derived from the score when decisive; required for level knockouts;
+    // always null for group games.
+    let winner: number | null = null;
+    if (m.stage !== "group") {
+      if (home > away) winner = m.home_team_id;
+      else if (away > home) winner = m.away_team_id;
+      else {
+        if (input.winnerTeamId !== m.home_team_id && input.winnerTeamId !== m.away_team_id) {
+          return { ok: false, error: "A drawn knockout needs an advancer." };
+        }
+        winner = input.winnerTeamId;
+      }
+    }
 
     const { data: updated, error: upErr } = await admin
       .from("matches")
       .update({
         home_score: home,
         away_score: away,
-        winner_team_id: input.winnerTeamId,
+        winner_team_id: winner,
         status: "final",
       })
       .eq("id", input.matchId)
@@ -221,13 +349,13 @@ export async function saveMatchResult(input: {
       .from("predictions")
       .select("*")
       .eq("match_id", input.matchId);
-    for (const p of (preds ?? []) as Prediction[]) {
+    await inChunks((preds ?? []) as Prediction[], async (p) => {
       const pts = scorePrediction(p, updated as Match);
       await admin
         .from("predictions")
         .update({ points_awarded: pts, scored: true })
         .eq("id", p.id);
-    }
+    });
 
     // When the Final or 3rd-place game is settled, re-derive and score the podium.
     const settledStage = (updated as Match).stage;
@@ -235,7 +363,8 @@ export async function saveMatchResult(input: {
       await settlePodiumWith(admin);
     }
 
-    revalidatePath("/leaderboard");
+    updateTag(TAG_MATCHES);
+    updateTag(TAG_LEADERBOARD);
     revalidatePath("/predictions");
     revalidatePath("/admin/results");
     return { ok: true };
@@ -253,11 +382,19 @@ export async function setMatchTeams(input: {
   try {
     await requireAdmin();
     const admin = createAdminClient();
+    if (
+      input.homeTeamId != null &&
+      input.awayTeamId != null &&
+      input.homeTeamId === input.awayTeamId
+    ) {
+      return { ok: false, error: "Home and away must be different teams." };
+    }
     const { error } = await admin
       .from("matches")
       .update({ home_team_id: input.homeTeamId, away_team_id: input.awayTeamId })
       .eq("id", input.matchId);
     if (error) return { ok: false, error: error.message };
+    updateTag(TAG_MATCHES);
     revalidatePath("/bracket");
     revalidatePath("/admin/results");
     return { ok: true };
@@ -274,12 +411,15 @@ export async function settleGroup(input: {
 }): Promise<Result> {
   try {
     await requireAdmin();
+    if (input.winnerId === input.runnerupId) {
+      return { ok: false, error: "Winner and runner-up must be different teams." };
+    }
     const admin = createAdminClient();
     const { data: preds } = await admin
       .from("group_predictions")
       .select("*")
       .eq("group_label", input.groupLabel);
-    for (const p of preds ?? []) {
+    await inChunks(preds ?? [], async (p) => {
       let pts = 0;
       if (p.pred_winner_team_id === input.winnerId) pts += GROUP_QUALIFIER_POINTS;
       if (p.pred_runnerup_team_id === input.runnerupId) pts += GROUP_QUALIFIER_POINTS;
@@ -287,32 +427,8 @@ export async function settleGroup(input: {
         .from("group_predictions")
         .update({ points_awarded: pts, scored: true })
         .eq("id", p.id);
-    }
-    revalidatePath("/leaderboard");
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
-}
-
-// ---------------- Podium (top-3) predictions ----------------
-export async function savePodiumPick(input: {
-  position: PodiumPosition;
-  teamId: number | null;
-}): Promise<Result> {
-  try {
-    const { supabase } = await requireUser();
-    // All podium writes go through a SECURITY DEFINER function that enforces the
-    // two-window rule and computes original/revised server-side. Users can't write
-    // the table directly (migration 0004 revokes it), so the early/late value and
-    // the "revised" flag can't be forged.
-    const { error } = await supabase.rpc("save_podium_pick", {
-      p_position: input.position,
-      p_team_id: input.teamId,
     });
-    if (error) return { ok: false, error: error.message };
-
-    revalidatePath("/tournament");
+    updateTag(TAG_LEADERBOARD);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -353,7 +469,7 @@ async function settlePodiumWith(admin: ReturnType<typeof createAdminClient>) {
 
   const actual: Record<number, number | null> = { 1: champ, 2: runnerUp, 3: third };
   const { data: preds } = await admin.from("podium_predictions").select("*");
-  for (const p of preds ?? []) {
+  await inChunks(preds ?? [], async (p) => {
     const want = actual[p.position];
     const correct = want != null && p.team_id === want;
     const pts = scorePodium(p.position, correct, p.revised);
@@ -361,7 +477,7 @@ async function settlePodiumWith(admin: ReturnType<typeof createAdminClient>) {
       .from("podium_predictions")
       .update({ points_awarded: pts, scored: true })
       .eq("id", p.id);
-  }
+  });
 }
 
 export async function settlePodium(): Promise<Result> {
@@ -369,7 +485,7 @@ export async function settlePodium(): Promise<Result> {
     await requireAdmin();
     const admin = createAdminClient();
     await settlePodiumWith(admin);
-    revalidatePath("/leaderboard");
+    updateTag(TAG_LEADERBOARD);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -381,19 +497,21 @@ export async function settleGoldenBoot(name: string): Promise<Result> {
   try {
     await requireAdmin();
     const admin = createAdminClient();
-    const target = name.trim().toLowerCase();
+    // Accent-insensitive: the picker stores API names ("José"), but settle by
+    // hand may type "Jose" — both must match.
+    const target = nameKey(String(name));
     const { data: preds } = await admin
       .from("tournament_predictions")
       .select("*")
       .eq("type", "golden_boot");
-    for (const p of preds ?? []) {
-      const hit = !!target && (p.text_value ?? "").trim().toLowerCase() === target;
+    await inChunks(preds ?? [], async (p) => {
+      const hit = !!target && nameKey(p.text_value ?? "") === target;
       await admin
         .from("tournament_predictions")
         .update({ points_awarded: hit ? GOLDEN_BOOT_POINTS : 0, scored: true })
         .eq("id", p.id);
-    }
-    revalidatePath("/leaderboard");
+    });
+    updateTag(TAG_LEADERBOARD);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };

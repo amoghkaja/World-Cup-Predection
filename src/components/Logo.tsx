@@ -1,59 +1,46 @@
 import Image from "next/image";
 
-// Brand mark: the World Cup trophy + two-line wordmark + year chip.
-// Two lines keeps it inside the mobile header next to the icon buttons.
+// Brand mark: trophy + a two-line typographic lockup.
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
-    <span className="inline-flex items-center" style={{ gap: 8 }}>
+    <span className="inline-flex items-center" style={{ gap: 9 }}>
       <Image
         src="/wc26-trophy.webp"
-        alt="World Cup trophy"
+        alt=""
         width={24}
         height={28}
         priority
-        style={{ height: 28, width: "auto" }}
+        style={{ height: 27, width: "auto" }}
       />
       {!compact && (
-        <span className="flex flex-col" style={{ gap: 2 }}>
+        <span className="flex flex-col" style={{ gap: 1 }}>
           <span
             style={{
               fontFamily: "var(--font-display)",
-              fontWeight: 800,
-              fontSize: 13.5,
-              letterSpacing: "-0.015em",
+              fontWeight: 700,
+              fontStretch: "112%",
+              fontSize: 9.5,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
               lineHeight: 1,
+              color: "var(--text-3)",
               whiteSpace: "nowrap",
             }}
           >
             World Cup
           </span>
-          <span className="inline-flex items-center" style={{ gap: 5 }}>
-            <span
-              style={{
-                fontFamily: "var(--font-display)",
-                fontWeight: 800,
-                fontSize: 13.5,
-                letterSpacing: "-0.015em",
-                lineHeight: 1,
-                whiteSpace: "nowrap",
-              }}
-            >
-              Pick&rsquo;em
-            </span>
-            <span
-              style={{
-                background: "var(--gold)",
-                color: "var(--on-gold)",
-                fontFamily: "var(--font-display)",
-                fontWeight: 800,
-                fontSize: 9.5,
-                lineHeight: 1,
-                padding: "2px 6px",
-                borderRadius: 999,
-              }}
-            >
-              2026
-            </span>
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontStretch: "110%",
+              fontSize: 15.5,
+              letterSpacing: "-0.01em",
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Pick&rsquo;em <span style={{ color: "var(--brand)" }}>26</span>
           </span>
         </span>
       )}

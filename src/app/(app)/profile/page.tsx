@@ -36,21 +36,17 @@ export default async function ProfilePage() {
   return (
     <div className="mx-auto w-full" style={{ maxWidth: 640 }}>
       {/* header card */}
-      <div className="card mb-[18px]" style={{ overflow: "hidden" }}>
-        <div style={{ height: 88, background: "var(--brand-grad)" }} />
-        <div style={{ padding: "0 20px 20px", marginTop: -38 }}>
-          <Avatar
-            name={name}
-            src={profile?.hide_avatar ? null : profile?.avatar_url}
-            size={76}
-            ring="var(--surface)"
-          />
-          <h1 className="t-h1" style={{ marginTop: 10 }}>
-            {name}
-          </h1>
+      <div className="card flex items-center mb-[18px]" style={{ padding: "18px 20px", gap: 16 }}>
+        <Avatar
+          name={name}
+          src={profile?.hide_avatar ? null : profile?.avatar_url}
+          size={64}
+        />
+        <div className="min-w-0">
+          <h1 className="t-h1 truncate">{name}</h1>
           <div className="t-sm" style={{ color: "var(--text-3)", marginTop: 2 }}>
             {my?.total_points ?? 0} pts
-            {rank ? ` · League rank #${rank}` : ""}
+            {rank ? ` · rank #${rank}` : ""}
           </div>
         </div>
       </div>

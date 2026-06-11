@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 
-// One shared 1s ticker for every countdown on screen — 100 match cards used to
+// One shared 1s ticker for every countdown on screen — 100 match rows used to
 // each run their own interval + re-render every second, which made the whole
 // page feel laggy on phones.
 type Tick = () => void;
@@ -21,7 +21,20 @@ function subscribe(fn: Tick): () => void {
   };
 }
 
+// Quantize "now" to the coarsest step the display can show ("2d 3h" only
+// changes hourly) — identical state means React skips the re-render.
+function quantized(ko: number, perSecond: boolean): number {
+  const n = Date.now();
+  const diff = ko - n;
+  if (diff <= 0) return ko; // locked: stable value, no further re-renders
+  const step = perSecond || diff < 3_600_000 ? 1000 : diff < 86_400_000 ? 60_000 : 3_600_000;
+  return Math.floor(n / step) * step;
+}
+
 // Inline (icon + "2d 3h", red under 1h) and big (dd:hh:mm:ss cells) countdowns.
+// Rendered once: the server's clock seeds SSR, the client's clock takes over at
+// hydration (suppressHydrationWarning on the numeric text), then the shared
+// ticker drives updates.
 export function Countdown({
   kickoff,
   variant = "inline",
@@ -33,28 +46,15 @@ export function Countdown({
   lockLabel?: string;
   className?: string;
 }) {
-  const [now, setNow] = useState<number | null>(null);
   const perSecond = variant === "big";
+  const ko = new Date(kickoff).getTime();
+  const [now, setNow] = useState(() => quantized(ko, perSecond));
 
   useEffect(() => {
-    const ko = new Date(kickoff).getTime();
-    // Quantize "now" to the coarsest step the display can show ("2d 3h" only
-    // changes hourly) — identical state means React skips the re-render.
-    const compute = () => {
-      const n = Date.now();
-      const diff = ko - n;
-      if (diff <= 0) return ko; // locked: stable value, no further re-renders
-      const step = perSecond || diff < 3_600_000 ? 1000 : diff < 86_400_000 ? 60_000 : 3_600_000;
-      return Math.floor(n / step) * step;
-    };
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only clock seed
-    setNow(compute());
-    return subscribe(() => setNow(compute()));
+    return subscribe(() => setNow(quantized(new Date(kickoff).getTime(), perSecond)));
   }, [kickoff, perSecond]);
 
-  if (now === null) return <span className={className}>—</span>;
-
-  const diff = new Date(kickoff).getTime() - now;
+  const diff = ko - now;
   const locked = diff <= 0;
   const s = Math.max(0, Math.floor(diff / 1000));
   const d = Math.floor(s / 86400);
@@ -71,8 +71,8 @@ export function Countdown({
       );
     }
     const cell = (v: number, l: string) => (
-      <div className="flex flex-col items-center" style={{ minWidth: 58 }}>
-        <span className="t-display tnum" style={{ fontSize: 42 }}>
+      <div className="flex flex-col items-center" style={{ minWidth: 56 }}>
+        <span className="t-display tnum" suppressHydrationWarning style={{ fontSize: 40 }}>
           {String(v).padStart(2, "0")}
         </span>
         <span className="t-label" style={{ color: "var(--text-3)", marginTop: 4 }}>
@@ -81,7 +81,7 @@ export function Countdown({
       </div>
     );
     const sep = (
-      <span className="t-display" style={{ fontSize: 34, color: "var(--line-strong)", marginTop: -6 }}>
+      <span className="t-display" aria-hidden style={{ fontSize: 32, color: "var(--line-strong)", marginTop: -6 }}>
         :
       </span>
     );
@@ -118,7 +118,7 @@ export function Countdown({
       {variant === "labeled" && !locked && (
         <span style={{ color: "var(--text-3)", fontWeight: 600 }}>{lockLabel}</span>
       )}
-      {txt}
+      <span suppressHydrationWarning>{txt}</span>
     </span>
   );
 }
