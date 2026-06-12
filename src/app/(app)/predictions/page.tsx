@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { getMatches, getMyPredictions } from "@/lib/queries";
+import { zonedDayKey, zonedDayLabel } from "@/lib/format";
+import { getViewerTimeZone } from "@/lib/tz";
 import type { MatchWithTeams, Prediction } from "@/lib/types";
 import { Icon } from "@/components/Icon";
-import { LocalDay } from "@/components/LocalTime";
 import { CompactPredictionRow } from "@/components/CompactPredictionRow";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +19,6 @@ function isSettled(m: MatchWithTeams): boolean {
   return m.status === "final" && m.home_score != null && m.away_score != null;
 }
 
-// Stable day key (UTC date) used for grouping + sorting newest-first.
-function dayKey(iso: string): string {
-  return new Date(iso).toISOString().slice(0, 10);
-}
-
 export default async function PredictionsPage({
   searchParams,
 }: {
@@ -31,7 +27,11 @@ export default async function PredictionsPage({
   const { tab: tabParam } = await searchParams;
   const tab: Tab = tabParam === "settled" || tabParam === "pending" ? tabParam : "all";
 
-  const [matches, preds] = await Promise.all([getMatches(), getMyPredictions()]);
+  const [matches, preds, tz] = await Promise.all([
+    getMatches(),
+    getMyPredictions(),
+    getViewerTimeZone(),
+  ]);
 
   const mine = matches
     .filter((m) => preds.has(m.id))
@@ -49,10 +49,10 @@ export default async function PredictionsPage({
     return true;
   });
 
-  // Group by day, newest day first.
+  // Group by the viewer's local day, newest day first.
   const dayMap = new Map<string, { match: MatchWithTeams; pred: Prediction }[]>();
   for (const item of list) {
-    const k = dayKey(item.match.kickoff_at);
+    const k = zonedDayKey(item.match.kickoff_at, tz);
     (dayMap.get(k) ?? dayMap.set(k, []).get(k)!).push(item);
   }
   const days = [...dayMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
@@ -142,7 +142,7 @@ export default async function PredictionsPage({
       {days.map(([k, items]) => (
         <div key={k} className="mb-[18px]">
           <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
-            <LocalDay iso={items[0].match.kickoff_at} />
+            {zonedDayLabel(items[0].match.kickoff_at, tz)}
           </div>
           <div className="card" style={{ overflow: "hidden" }}>
             {items.map((item, i) => (
