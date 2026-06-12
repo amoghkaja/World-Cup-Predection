@@ -10,20 +10,49 @@ import { PointsBadge } from "@/components/PointsBadge";
 import { PredictionForm } from "@/components/PredictionForm";
 import { Countdown } from "@/components/Countdown";
 
+// Settled rows break the verdict into its two scored parts: the result
+// (winner/draw) and the exact scoreline. Result misses are red; a missed
+// scoreline is neutral — it's a bonus, not an error.
+function TickChip({ ok, miss, label }: { ok: boolean; miss?: "bad"; label: string }) {
+  const fg = ok ? "var(--good)" : miss === "bad" ? "var(--bad)" : "var(--text-3)";
+  const bg = ok ? "var(--good-soft)" : miss === "bad" ? "var(--bad-soft)" : "var(--surface-2)";
+  return (
+    <span
+      className="inline-flex items-center"
+      style={{ gap: 5, fontSize: 11, fontWeight: 700, color: fg }}
+    >
+      <span
+        className="grid place-items-center"
+        style={{ width: 16, height: 16, borderRadius: 999, background: bg }}
+      >
+        <Icon name={ok ? "check" : "x"} size={9.5} sw={3.2} />
+      </span>
+      {label}
+    </span>
+  );
+}
+
 // One row of the My Predictions list. Open matches can be edited inline; settled
-// matches show the result + points; in-progress matches are read-only.
+// matches show the result + points; in-progress matches are read-only. Pass
+// `ownerName` when rendering someone else's pick (e.g. the /u/[id] page).
 export function CompactPredictionRow({
   match,
   pred,
   last,
+  ownerName,
 }: {
   match: MatchWithTeams;
   pred: Prediction;
   last?: boolean;
+  ownerName?: string;
 }) {
   const settled = match.status === "final" && match.home_score != null && match.away_score != null;
   const actual = actualOutcomeForMatch(match);
   const correct = settled && actual != null && pred.pred_outcome === actual;
+  const exact =
+    settled &&
+    pred.pred_home_score === match.home_score &&
+    pred.pred_away_score === match.away_score;
   const locked = isLocked(match.kickoff_at);
   const editable = !locked && !settled;
 
@@ -71,7 +100,8 @@ export function CompactPredictionRow({
                 padding: "3px 9px",
               }}
             >
-              Your pick {pred.pred_home_score}–{pred.pred_away_score}
+              {ownerName ? `${ownerName}'s pick` : "Your pick"} {pred.pred_home_score}–
+              {pred.pred_away_score}
             </span>
             <span className="t-xs" style={{ color: "var(--text-3)" }}>
               {match.group_label ? `Group ${match.group_label}` : "Knockout"}
@@ -84,19 +114,11 @@ export function CompactPredictionRow({
         </div>
 
         {settled ? (
-          <div className="flex items-center gap-2">
-            <span
-              className="grid place-items-center"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 999,
-                background: correct ? "var(--good-soft)" : "var(--bad-soft)",
-                color: correct ? "var(--good)" : "var(--bad)",
-              }}
-            >
-              <Icon name={correct ? "check" : "x"} size={13} sw={3} />
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="flex flex-col items-start" style={{ gap: 4 }}>
+              <TickChip ok={correct} miss="bad" label={actual === "draw" ? "Result" : "Winner"} />
+              <TickChip ok={exact} label="Score" />
+            </div>
             <PointsBadge pts={pred.points_awarded} state={pred.points_awarded > 0 ? undefined : "miss"} />
           </div>
         ) : editable ? (
