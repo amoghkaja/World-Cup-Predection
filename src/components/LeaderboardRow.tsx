@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
+import { accuracyPct } from "@/lib/scoring";
 import { Avatar } from "@/components/Avatar";
 
 // Medal disc for the top three, plain rank number for everyone else.
@@ -21,10 +22,7 @@ export function LeaderboardRow({
   me?: boolean;
   last?: boolean;
 }) {
-  const acc =
-    row.total_match_preds > 0
-      ? Math.round((row.correct_matches / row.total_match_preds) * 100)
-      : 0;
+  const acc = accuracyPct(row);
   const medal = MEDALS[rank];
 
   return (

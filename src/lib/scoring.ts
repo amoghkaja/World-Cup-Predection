@@ -80,6 +80,26 @@ export function maxPointsForStage(stage: MatchStage): number {
 }
 
 /**
+ * Leaderboard accuracy. Every settled pick is two predictions — the result and
+ * the exact score — so accuracy = component hits / (2 × settled picks): getting
+ * only the winner right drops you to 50% for that match. Falls back to the old
+ * result-only formula until the view exposes correct_scores (migration 0009).
+ */
+export function accuracyPct(row: {
+  correct_matches: number;
+  total_match_preds: number;
+  correct_scores?: number | null;
+}): number {
+  if (row.total_match_preds === 0) return 0;
+  if (row.correct_scores == null) {
+    return Math.round((row.correct_matches / row.total_match_preds) * 100);
+  }
+  return Math.round(
+    ((row.correct_matches + row.correct_scores) / (2 * row.total_match_preds)) * 100
+  );
+}
+
+/**
  * Podium points for one position (1, 2 or 3): the early value if correct & not revised,
  * the late value if correct & revised, otherwise 0.
  */

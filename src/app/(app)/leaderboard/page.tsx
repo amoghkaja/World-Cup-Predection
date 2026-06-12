@@ -58,7 +58,7 @@ export default async function LeaderboardPage() {
       )}
 
       <div className="t-xs text-center" style={{ color: "var(--text-3)", marginTop: 14 }}>
-        Updates as results come in · accuracy = correct outcomes ÷ settled picks
+        Updates as results come in · every settled pick counts twice for accuracy: winner &amp; exact score
       </div>
     </div>
   );

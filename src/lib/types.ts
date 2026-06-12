@@ -96,6 +96,7 @@ export interface LeaderboardRow {
   total_points: number;
   correct_matches: number;
   total_match_preds: number;
+  correct_scores?: number | null; // exact-score hits; absent until migration 0009 runs
 }
 
 export const STAGE_LABELS: Record<MatchStage, string> = {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getLeaderboard, getProfile } from "@/lib/queries";
+import { accuracyPct } from "@/lib/scoring";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
 import { ProfileEditor } from "@/components/ProfileEditor";
@@ -12,10 +13,7 @@ export default async function ProfilePage() {
 
   const my = board.find((r) => r.user_id === profile!.id) ?? null;
   const rank = my?.rank ?? null;
-  const acc =
-    my && my.total_match_preds > 0
-      ? Math.round((my.correct_matches / my.total_match_preds) * 100)
-      : 0;
+  const acc = my ? accuracyPct(my) : 0;
 
   const name = profile?.display_name ?? "You";
 
