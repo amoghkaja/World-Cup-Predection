@@ -16,7 +16,6 @@ const FULL: Intl.DateTimeFormatOptions = {
   timeZoneName: "short",
 };
 const TIME: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
-const DAY: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
 
 function local(iso: string, fmt: Intl.DateTimeFormatOptions): string {
   return new Date(iso).toLocaleString(undefined, fmt);
@@ -34,9 +33,4 @@ export function LocalKickoff({ iso, className }: { iso: string; className?: stri
       {local(iso, TIME)}
     </span>
   );
-}
-
-/** Day label, e.g. "Thu, Jun 11", in the visitor's timezone. */
-export function LocalDay({ iso }: { iso: string }) {
-  return <span suppressHydrationWarning>{local(iso, DAY)}</span>;
 }

@@ -8,6 +8,7 @@ import {
   tournamentLockAt,
 } from "@/lib/queries";
 import { isLocked, serverNow } from "@/lib/format";
+import { getViewerTimeZone } from "@/lib/tz";
 import { maybeKickResultsSync } from "@/lib/autosync";
 import { DashboardMatchList, type FeedMatch, type FeedPick } from "@/components/MatchCard";
 import { Icon } from "@/components/Icon";
@@ -17,13 +18,14 @@ import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [matches, preds, profile, setup, lockAt, board] = await Promise.all([
+  const [matches, preds, profile, setup, lockAt, board, tz] = await Promise.all([
     getMatches(),
     getMyPredictions(),
     getProfile(),
     getSetupStatus(),
     tournamentLockAt(),
     getLeaderboard(),
+    getViewerTimeZone(),
   ]);
   const now = serverNow();
 
@@ -244,7 +246,7 @@ export default async function DashboardPage() {
           )}
 
           {/* filterable, day-grouped match list (upcoming + live only) */}
-          <DashboardMatchList matches={feed} picks={picks} toPickCount={toPick} />
+          <DashboardMatchList matches={feed} picks={picks} toPickCount={toPick} tz={tz} />
 
           {/* finished games live in Results & Tables */}
           {finishedCount > 0 && (

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { TimezoneCookie } from "@/components/TimezoneCookie";
 import "./globals.css";
 
 // One variable font (weight + width axes) for headings, scores and labels;
@@ -38,6 +39,7 @@ export default function RootLayout({
     <html lang="en" className={`${archivo.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         {children}
+        <TimezoneCookie />
         <Analytics />
         <SpeedInsights />
       </body>

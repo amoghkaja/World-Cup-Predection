@@ -4,15 +4,13 @@ import { useMemo, useState } from "react";
 import type { GroupTable } from "@/lib/standings";
 import type { MatchWithTeams } from "@/lib/types";
 import { STAGE_LABELS } from "@/lib/types";
+import { zonedDayKey, zonedDayLabel } from "@/lib/format";
 import { Flag } from "./TeamBadge";
 import { Icon } from "./Icon";
-import { LocalDay, LocalKickoff } from "./LocalTime";
+import { LocalKickoff } from "./LocalTime";
 import { Segmented } from "./Segmented";
 
 type View = "tables" | "matches";
-
-// Stable (timezone-independent) day key; the visible label is localized.
-const dayKey = (iso: string) => iso.slice(0, 10);
 
 const isFinished = (m: MatchWithTeams) =>
   m.status === "final" && m.home_score != null && m.away_score != null;
@@ -21,9 +19,12 @@ const isFinished = (m: MatchWithTeams) =>
 export function ResultsExplorer({
   standings,
   matches,
+  tz,
 }: {
   standings: GroupTable[];
   matches: MatchWithTeams[];
+  /** Viewer's IANA timezone — match days group on the viewer's calendar. */
+  tz: string | null;
 }) {
   const [view, setView] = useState<View>("tables");
   const [teamId, setTeamId] = useState<number | null>(null);
@@ -52,11 +53,11 @@ export function ResultsExplorer({
   const days = useMemo(() => {
     const map = new Map<string, MatchWithTeams[]>();
     for (const m of list) {
-      const k = dayKey(m.kickoff_at);
+      const k = zonedDayKey(m.kickoff_at, tz);
       (map.get(k) ?? map.set(k, []).get(k)!).push(m);
     }
     return [...map.entries()];
-  }, [list]);
+  }, [list, tz]);
 
   function pickTeam(id: number) {
     setTeamId(id);
@@ -201,7 +202,7 @@ export function ResultsExplorer({
           {days.map(([k, ms]) => (
             <div key={k} className="flex flex-col" style={{ gap: 8 }}>
               <div className="t-label" style={{ color: "var(--text-3)" }}>
-                <LocalDay iso={ms[0].kickoff_at} />
+                {zonedDayLabel(ms[0].kickoff_at, tz)}
               </div>
               <div className="card" style={{ overflow: "hidden" }}>
                 {ms.map((m, i) => {

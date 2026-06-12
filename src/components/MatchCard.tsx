@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { MatchStage, MatchStatus, PredOutcome } from "@/lib/types";
-import { elapsedSince, isLocked } from "@/lib/format";
+import { elapsedSince, isLocked, zonedDayKey, zonedDayLabel } from "@/lib/format";
 import { Icon } from "./Icon";
-import { LocalDay, LocalKickoff } from "./LocalTime";
+import { LocalKickoff } from "./LocalTime";
 import { Flag } from "./TeamBadge";
 import { Countdown } from "./Countdown";
 import { Segmented } from "./Segmented";
@@ -226,19 +226,20 @@ export function MatchRow({
 
 type Filter = "all" | "topick" | "mine";
 
-// Stable (timezone-independent) day key; the visible label is localized.
-const dayKey = (iso: string) => iso.slice(0, 10);
-
 /** Day-grouped, filterable home feed. */
 export function DashboardMatchList({
   matches,
   picks,
   toPickCount,
+  tz,
 }: {
   matches: FeedMatch[];
   /** [matchId, pick] entries (Maps aren't serializable across the RSC boundary) */
   picks: [number, FeedPick][];
   toPickCount: number;
+  /** Viewer's IANA timezone (wc_tz cookie) — a late local kickoff (8pm ET =
+      midnight UTC) must group under the day people actually watch it. */
+  tz: string | null;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const pickMap = useMemo(() => new Map(picks), [picks]);
@@ -255,12 +256,12 @@ export function DashboardMatchList({
   const days = useMemo(() => {
     const map = new Map<string, FeedMatch[]>();
     for (const m of list) {
-      const k = dayKey(m.kickoff);
+      const k = zonedDayKey(m.kickoff, tz);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(m);
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [list]);
+  }, [list, tz]);
 
   return (
     <div className="flex flex-col" style={{ gap: 20 }}>
@@ -292,7 +293,7 @@ export function DashboardMatchList({
         <section key={dk} className="flex flex-col" style={{ gap: 8 }}>
           <div className="flex items-baseline justify-between px-0.5">
             <span className="t-label" style={{ color: "var(--text-2)" }}>
-              <LocalDay iso={ms[0].kickoff} />
+              {zonedDayLabel(ms[0].kickoff, tz)}
             </span>
             <span className="t-xs" style={{ color: "var(--text-3)" }}>
               {ms.length} match{ms.length > 1 ? "es" : ""}
