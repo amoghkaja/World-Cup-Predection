@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, getLeaderboard, getTeams, tournamentLockAt } from "@/lib/queries";
+import { getCurrentUser, getLeaderboard, getTeams, podiumWindows } from "@/lib/queries";
 import type {
   GroupPrediction,
   MatchWithTeams,
@@ -41,7 +41,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const supabase = await createClient();
   // RLS hides other users' tournament/group/podium picks until their lock
   // passes, so the extra queries simply come back empty before then.
-  const [{ data: prof }, lb, { data: rows }, { data: podium }, { data: tourn }, { data: groups }, teams, lockAt] =
+  const [{ data: prof }, lb, { data: rows }, { data: podium }, { data: tourn }, { data: groups }, teams, windows] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
       getLeaderboard(),
@@ -50,7 +50,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
       supabase.from("tournament_predictions").select("*").eq("user_id", id),
       supabase.from("group_predictions").select("*").eq("user_id", id).order("group_label"),
       getTeams(),
-      tournamentLockAt(),
+      podiumWindows(),
     ]);
   if (!prof) notFound();
   const profile = prof as Profile;
@@ -63,7 +63,10 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const groupPicks = ((groups ?? []) as GroupPrediction[]).filter(
     (g) => g.pred_winner_team_id != null || g.pred_runnerup_team_id != null
   );
-  const tournamentLocked = lockAt != null && isLocked(lockAt);
+  const tournamentLocked = windows.firstKickoff != null && isLocked(windows.firstKickoff);
+  // Podium picks stay revisable (and therefore RLS-hidden to others) until the
+  // first knockout match — golden boot & group picks unlock at first kickoff.
+  const podiumRevealed = windows.firstR32Kickoff != null && isLocked(windows.firstR32Kickoff);
   const hasCalls = podiumPicks.length > 0 || goldenBoot != null || groupPicks.length > 0;
 
   const mine = lb.find((r) => r.user_id === id);
@@ -108,13 +111,21 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
           <p className="t-sm flex items-center gap-2" style={{ color: "var(--text-3)" }}>
             <Icon name="lock" size={15} /> Hidden until the tournament kicks off.
           </p>
-        ) : !hasCalls ? (
+        ) : podiumRevealed && !hasCalls ? (
           <p className="t-sm" style={{ color: "var(--text-3)" }}>
             {firstName} didn&rsquo;t lock in any pre-tournament picks.
           </p>
         ) : (
           <div className="flex flex-col" style={{ gap: 10 }}>
-            {PODIUM_LABELS.map(({ position, label }) => {
+            {!podiumRevealed && (
+              <p className="t-sm flex items-center gap-2" style={{ color: "var(--text-3)" }}>
+                <Icon name="lock" size={15} style={{ flex: "none" }} />
+                Champion, runner-up &amp; third place stay hidden until the knockouts begin —
+                podium picks can still be revised after the group stage.
+              </p>
+            )}
+            {podiumRevealed &&
+              PODIUM_LABELS.map(({ position, label }) => {
               const team = teamById.get(
                 podiumPicks.find((p) => p.position === position)?.team_id ?? -1
               );
