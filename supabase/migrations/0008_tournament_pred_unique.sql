@@ -19,5 +19,10 @@ where newer.user_id = t.user_id
 alter table public.tournament_predictions
   drop constraint if exists tournament_predictions_user_id_type_team_id_key;
 
+-- Idempotent: drop-then-add so re-running this file never errors on a
+-- constraint that already exists.
+alter table public.tournament_predictions
+  drop constraint if exists tournament_predictions_user_type_key;
+
 alter table public.tournament_predictions
   add constraint tournament_predictions_user_type_key unique (user_id, type);
