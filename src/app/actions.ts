@@ -13,9 +13,14 @@ import { isLocked } from "@/lib/format";
 import {
   scorePrediction,
   scorePodium,
+  featuresActiveFor,
+  isValidOuLine,
   GROUP_QUALIFIER_POINTS,
   GOLDEN_BOOT_POINTS,
+  type SideBetMarket,
+  type SideBetPick,
 } from "@/lib/scoring";
+import { settleMatchSideEffects, recomputeStreaksAndPerfectDays } from "@/lib/settle";
 import type { Match, PodiumPosition, PredOutcome, Prediction } from "@/lib/types";
 
 type Result<T = void> = { ok: true; data?: T } | { ok: false; error: string };
@@ -109,6 +114,102 @@ export async function savePrediction(input: {
     revalidatePath("/bracket");
     revalidatePath(`/matches/${input.matchId}`);
     revalidatePath("/predictions");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------- Side bets (opt-in gambles) ----------------
+export async function saveSideBet(input: {
+  matchId: number;
+  market: SideBetMarket;
+  pick: SideBetPick;
+  line?: number | null;
+}): Promise<Result> {
+  try {
+    const { supabase } = await requireUser();
+
+    if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
+    if (input.market !== "btts" && input.market !== "ou") {
+      return { ok: false, error: "Invalid market" };
+    }
+    const okPick =
+      input.market === "btts"
+        ? input.pick === "yes" || input.pick === "no"
+        : input.pick === "over" || input.pick === "under";
+    if (!okPick) return { ok: false, error: "Invalid pick" };
+    const line = input.market === "ou" ? input.line ?? null : null;
+    if (input.market === "ou" && (line == null || !isValidOuLine(line))) {
+      return { ok: false, error: "Pick a line between 0.5 and 6.5." };
+    }
+
+    const match = await getMatch(input.matchId);
+    if (!match) return { ok: false, error: "Match not found" };
+    if (!featuresActiveFor(match.kickoff_at)) {
+      return { ok: false, error: "Side bets aren't available for this match." };
+    }
+    if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
+      return { ok: false, error: "This match is locked — the deadline has passed." };
+    }
+
+    const { error } = await supabase.rpc("save_side_bet", {
+      p_match_id: input.matchId,
+      p_market: input.market,
+      p_pick: input.pick,
+      p_line: line,
+    });
+    if (error) {
+      if (error.code === "42501" || /row-level security/i.test(error.message)) {
+        return { ok: false, error: "This match is locked — the deadline has passed." };
+      }
+      return { ok: false, error: error.message };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath(`/matches/${input.matchId}`);
+    revalidatePath("/predictions");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// ---------------- Joker / double-down ----------------
+export async function saveJoker(input: { matchId: number }): Promise<Result> {
+  try {
+    const { supabase } = await requireUser();
+    if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
+
+    const match = await getMatch(input.matchId);
+    if (!match) return { ok: false, error: "Match not found" };
+    if (!featuresActiveFor(match.kickoff_at)) {
+      return { ok: false, error: "The joker isn't available for this match." };
+    }
+    if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
+      return { ok: false, error: "This match is locked — the deadline has passed." };
+    }
+
+    const { error } = await supabase.rpc("save_joker", { p_match_id: input.matchId });
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/dashboard");
+    revalidatePath(`/matches/${input.matchId}`);
+    revalidatePath("/predictions");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+export async function clearJoker(input: { matchId: number }): Promise<Result> {
+  try {
+    const { supabase } = await requireUser();
+    if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
+    const { error } = await supabase.rpc("clear_joker", { p_match_id: input.matchId });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/dashboard");
+    revalidatePath(`/matches/${input.matchId}`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -363,6 +464,10 @@ export async function saveMatchResult(input: {
       await settlePodiumWith(admin);
     }
 
+    // Side bets + joker for this match, then the global streak/perfect-day rebuild.
+    await settleMatchSideEffects(admin, updated as Match);
+    await recomputeStreaksAndPerfectDays(admin);
+
     updateTag(TAG_MATCHES);
     updateTag(TAG_LEADERBOARD);
     revalidatePath("/predictions");
@@ -511,6 +616,29 @@ export async function settleGoldenBoot(name: string): Promise<Result> {
         .update({ points_awarded: hit ? GOLDEN_BOOT_POINTS : 0, scored: true })
         .eq("id", p.id);
     });
+    updateTag(TAG_LEADERBOARD);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// Admin: (re)compute side bets / joker / streak / perfect-day across every
+// already-final eligible match. Idempotent — for backfilling after deploy or
+// re-running after tuning the scoring constants.
+export async function recomputeFeatureScoring(): Promise<Result> {
+  try {
+    await requireAdmin();
+    const admin = createAdminClient();
+    const { data: finals } = await admin
+      .from("matches")
+      .select("*")
+      .eq("status", "final")
+      .order("kickoff_at");
+    for (const m of (finals ?? []) as Match[]) {
+      await settleMatchSideEffects(admin, m);
+    }
+    await recomputeStreaksAndPerfectDays(admin);
     updateTag(TAG_LEADERBOARD);
     return { ok: true };
   } catch (e) {

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/queries";
 import { Shell } from "@/components/Shell";
 import { Onboarding } from "@/components/Onboarding";
+import { FeatureSplash } from "@/components/FeatureSplash";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const profile = await getProfile();
@@ -19,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </Shell>
       <Onboarding />
+      <FeatureSplash />
     </>
   );
 }

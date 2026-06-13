@@ -5,6 +5,14 @@ import {
   PODIUM_EARLY,
   GOLDEN_BOOT_POINTS,
   maxPointsForStage,
+  BTTS_REWARD,
+  BTTS_PENALTY,
+  JOKER_WRONG_PENALTY,
+  STREAK_BONUS,
+  PERFECT_DAY_BASE,
+  PERFECT_DAY_PER_MATCH,
+  PERFECT_DAY_MIN_PICKS,
+  ouPayout,
 } from "@/lib/scoring";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -390,6 +398,105 @@ export default function ScoringPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* gambles & bonuses */}
+      <div className="card mb-[18px]" style={{ padding: "20px" }}>
+        <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
+          <Icon name="dice" size={20} style={{ color: "var(--brand-strong)" }} />
+          <h2 className="t-h2">Gambles &amp; bonuses</h2>
+        </div>
+        <p className="t-sm" style={{ color: "var(--text-2)", marginBottom: 14 }}>
+          Optional extras that go live once every team has played its first game. Side bets are a
+          gamble (a wrong call loses points); streaks &amp; perfect days are bonuses on your main picks.
+        </p>
+
+        <div className="flex flex-col gap-2.5">
+          {/* BTTS */}
+          <Row title="Both teams to score?" desc="A coin-flip yes/no call.">
+            <span style={{ color: "var(--good)", fontWeight: 800 }}>+{BTTS_REWARD}</span>
+            <span style={{ color: "var(--text-3)" }}> / </span>
+            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{BTTS_PENALTY}</span>
+          </Row>
+
+          {/* Over/Under odds table */}
+          <div style={{ padding: "11px 13px", borderRadius: 12, background: "var(--surface-2)" }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Over / Under — you pick the line</div>
+            <div className="t-xs" style={{ color: "var(--text-3)", marginBottom: 8 }}>
+              Payout scales with the odds: safe lines pay little, bold lines pay big (and cost more if
+              they miss).
+            </div>
+            <div className="flex flex-col" style={{ gap: 4 }}>
+              {[0.5, 1.5, 2.5, 3.5, 4.5].map((l) => {
+                const o = ouPayout("over", l);
+                return (
+                  <div key={l} className="flex items-center justify-between tnum" style={{ fontSize: 13 }}>
+                    <span style={{ color: "var(--text-2)" }}>Over {l}</span>
+                    <span>
+                      <span style={{ color: "var(--good)", fontWeight: 700 }}>win +{o.win}</span>
+                      <span style={{ color: "var(--text-3)" }}> · </span>
+                      <span style={{ color: "var(--bad)", fontWeight: 700 }}>miss {o.loss}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Joker */}
+          <Row title="Joker / double-down" desc="One per day. Stake it on a match.">
+            <span style={{ color: "var(--good)", fontWeight: 800 }}>×2</span>
+            <span style={{ color: "var(--text-3)" }}> / </span>
+            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{JOKER_WRONG_PENALTY}</span>
+          </Row>
+
+          {/* Streak */}
+          <Row
+            title="Streak bonus"
+            desc="Consecutive correct picks. A wrong or skipped game resets it."
+          >
+            <span className="tnum" style={{ color: "var(--gold-strong)", fontWeight: 800 }}>
+              up to +{STREAK_BONUS[STREAK_BONUS.length - 1]}/match
+            </span>
+          </Row>
+
+          {/* Perfect day */}
+          <Row
+            title="Perfect matchday"
+            desc={`Pick every match that day (min ${PERFECT_DAY_MIN_PICKS}) and get them all right.`}
+          >
+            <span className="tnum" style={{ color: "var(--gold-strong)", fontWeight: 800 }}>
+              +{PERFECT_DAY_BASE}&nbsp;+&nbsp;{PERFECT_DAY_PER_MATCH}/match
+            </span>
+          </Row>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  title,
+  desc,
+  children,
+}: {
+  title: string;
+  desc: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="flex items-center justify-between gap-3"
+      style={{ padding: "11px 13px", borderRadius: 12, background: "var(--surface-2)" }}
+    >
+      <div className="min-w-0">
+        <div style={{ fontWeight: 700, fontSize: 14 }}>{title}</div>
+        <div className="t-xs" style={{ color: "var(--text-3)" }}>
+          {desc}
+        </div>
+      </div>
+      <div className="tnum" style={{ fontSize: 14, whiteSpace: "nowrap", flex: "none" }}>
+        {children}
       </div>
     </div>
   );

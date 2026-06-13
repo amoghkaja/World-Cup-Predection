@@ -10,6 +10,7 @@ import { Flag } from "./TeamBadge";
 import { Countdown } from "./Countdown";
 import { Segmented } from "./Segmented";
 import { PredictionForm } from "./PredictionForm";
+import { SideBetControls, type SideState } from "./SideBetControls";
 
 /**
  * Slim shapes for the home feed — the dashboard used to serialize full DB rows
@@ -26,6 +27,8 @@ export type FeedMatch = {
   away: FeedTeam | null;
   homePh: string | null;
   awayPh: string | null;
+  /** side bets + joker are offered (kickoff ≥ the activation cutoff) */
+  eligible: boolean;
 };
 export type FeedPick = {
   h: number;
@@ -34,6 +37,15 @@ export type FeedPick = {
   pts: number;
   scored: boolean;
 };
+
+// Canonical tournament day (matches SQL tournament_day) for the one-joker-per-day rule.
+const TOURN_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const tournDay = (iso: string) => TOURN_DAY.format(new Date(iso));
 
 const STAGE_SHORT: Record<MatchStage, string> = {
   group: "Group",
@@ -55,12 +67,18 @@ export function MatchRow({
   pick,
   divider,
   tz,
+  side,
+  jokerOnMatch,
+  jokerUsedElsewhere,
 }: {
   m: FeedMatch;
   pick: FeedPick | null;
   divider: boolean;
   /** Viewer's IANA timezone — kickoff clock renders in it server-side. */
   tz: string | null;
+  side: SideState;
+  jokerOnMatch: boolean;
+  jokerUsedElsewhere: boolean;
 }) {
   const locked = isLocked(m.kickoff);
   const open = !locked && m.status === "scheduled";
@@ -163,6 +181,9 @@ export function MatchRow({
 
         {/* pick / state */}
         <span className="flex items-center" style={{ gap: 8, flex: "none" }}>
+          {jokerOnMatch && (
+            <Icon name="star" size={15} sw={2} style={{ color: "var(--gold-strong)" }} aria-label="Joker" />
+          )}
           {right}
         </span>
       </button>
@@ -221,6 +242,17 @@ export function MatchRow({
             compact
             onSaved={() => setEditing(false)}
           />
+
+          {m.eligible && open && (
+            <div style={{ borderTop: "1px dashed var(--line)", paddingTop: 4 }}>
+              <SideBetControls
+                matchId={m.id}
+                side={side}
+                joker={jokerOnMatch}
+                jokerUsedElsewhere={jokerUsedElsewhere}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -235,6 +267,9 @@ export function DashboardMatchList({
   picks,
   toPickCount,
   tz,
+  sides = [],
+  jokerMatches = [],
+  jokerDays = [],
 }: {
   matches: FeedMatch[];
   /** [matchId, pick] entries (Maps aren't serializable across the RSC boundary) */
@@ -243,9 +278,18 @@ export function DashboardMatchList({
   /** Viewer's IANA timezone (wc_tz cookie) — a late local kickoff (8pm ET =
       midnight UTC) must group under the day people actually watch it. */
   tz: string | null;
+  /** [matchId, current side-bet state] */
+  sides?: [number, SideState][];
+  /** match ids the joker is currently staked on */
+  jokerMatches?: number[];
+  /** canonical tournament days a joker is already used on */
+  jokerDays?: string[];
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const pickMap = useMemo(() => new Map(picks), [picks]);
+  const sideMap = useMemo(() => new Map(sides), [sides]);
+  const jokerSet = useMemo(() => new Set(jokerMatches), [jokerMatches]);
+  const jokerDaySet = useMemo(() => new Set(jokerDays), [jokerDays]);
 
   const list = useMemo(() => {
     return matches.filter((m) => {
@@ -311,9 +355,21 @@ export function DashboardMatchList({
               containIntrinsicSize: `auto ${ms.length * 65 + 2}px`,
             }}
           >
-            {ms.map((m, i) => (
-              <MatchRow key={m.id} m={m} pick={pickMap.get(m.id) ?? null} divider={i > 0} tz={tz} />
-            ))}
+            {ms.map((m, i) => {
+              const jokerOnMatch = jokerSet.has(m.id);
+              return (
+                <MatchRow
+                  key={m.id}
+                  m={m}
+                  pick={pickMap.get(m.id) ?? null}
+                  divider={i > 0}
+                  tz={tz}
+                  side={sideMap.get(m.id) ?? {}}
+                  jokerOnMatch={jokerOnMatch}
+                  jokerUsedElsewhere={!jokerOnMatch && jokerDaySet.has(tournDay(m.kickoff))}
+                />
+              );
+            })}
           </div>
         </section>
       ))}
