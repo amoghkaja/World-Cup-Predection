@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMatch, getMyPredictions, getSetupStatus } from "@/lib/queries";
 import { isLocked } from "@/lib/format";
+import { getViewerTimeZone } from "@/lib/tz";
 import { LocalTime } from "@/components/LocalTime";
 import { OUTCOME_POINTS, EXACT_BONUS, maxPointsForStage } from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/types";
@@ -18,10 +19,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const matchId = Number(id);
   if (!Number.isFinite(matchId)) notFound();
 
-  const [match, preds, setup] = await Promise.all([
+  const [match, preds, setup, tz] = await Promise.all([
     getMatch(matchId),
     getMyPredictions(),
     getSetupStatus(),
+    getViewerTimeZone(),
   ]);
   if (!match) notFound();
 
@@ -131,7 +133,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           className="t-sm text-center"
           style={{ color: "var(--text-3)", paddingBottom: 18, paddingTop: 6 }}
         >
-          <LocalTime iso={match.kickoff_at} />
+          <LocalTime iso={match.kickoff_at} tz={tz} />
           {match.label ? ` · ${match.label}` : ""}
         </div>
 

@@ -7,6 +7,7 @@ import {
   tournamentLockAt,
 } from "@/lib/queries";
 import { isLocked } from "@/lib/format";
+import { getViewerTimeZone } from "@/lib/tz";
 import { Countdown } from "@/components/Countdown";
 import { LocalTime } from "@/components/LocalTime";
 import { TournamentPicker, type PodiumWindowState } from "@/components/TournamentPicker";
@@ -54,13 +55,14 @@ function PitchLines() {
 }
 
 export default async function TournamentPage() {
-  const [teams, players, tourPreds, podium, windows, lockAt] = await Promise.all([
+  const [teams, players, tourPreds, podium, windows, lockAt, tz] = await Promise.all([
     getTeams(),
     getPlayers(),
     getMyTournamentPredictions(),
     getMyPodiumPredictions(),
     podiumWindows(),
     tournamentLockAt(),
+    getViewerTimeZone(),
   ]);
   const locked = lockAt ? isLocked(lockAt) : false;
   const golden = tourPreds.find((p) => p.type === "golden_boot") ?? null;
@@ -107,7 +109,7 @@ export default async function TournamentPage() {
               </div>
               <div className="t-xs" style={{ opacity: 0.8, marginTop: 12 }}>
                 {locked ? "Picks are locked" : "Locks at first kickoff"} ·{" "}
-                <LocalTime iso={lockAt} />
+                <LocalTime iso={lockAt} tz={tz} />
               </div>
             </>
           )}
