@@ -80,6 +80,28 @@ export interface PodiumPrediction {
   scored: boolean;
 }
 
+export interface SideBet {
+  id: number;
+  user_id: string;
+  match_id: number;
+  market: "btts" | "ou";
+  pick: "yes" | "no" | "over" | "under";
+  line: number | null;
+  submitted_at: string;
+  points_awarded: number;
+  scored: boolean;
+}
+
+export interface JokerPick {
+  id: number;
+  user_id: string;
+  match_id: number;
+  joker_day: string;
+  submitted_at: string;
+  points_awarded: number;
+  scored: boolean;
+}
+
 export interface Profile {
   id: string;
   display_name: string | null;

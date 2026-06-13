@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MatchWithTeams, Prediction } from "@/lib/types";
+import type { MatchWithTeams, Prediction, SideBet, JokerPick } from "@/lib/types";
 import { actualOutcomeForMatch } from "@/lib/scoring";
 import { isLocked } from "@/lib/format";
 import { Flag } from "@/components/TeamBadge";
@@ -35,16 +35,47 @@ function TickChip({ ok, miss, label }: { ok: boolean; miss?: "bad"; label: strin
 // One row of the My Predictions list. Open matches can be edited inline; settled
 // matches show the result + points; in-progress matches are read-only. Pass
 // `ownerName` when rendering someone else's pick (e.g. the /u/[id] page).
+// Small chip for a settled gamble outcome (green win / red loss).
+function GambleChip({ label, pts, star }: { label: string; pts: number; star?: boolean }) {
+  const good = pts > 0;
+  return (
+    <span
+      className="inline-flex items-center tnum"
+      style={{
+        gap: 4,
+        fontSize: 10.5,
+        fontWeight: 700,
+        padding: "2px 7px",
+        borderRadius: 999,
+        background: good ? "var(--good-soft)" : "var(--bad-soft)",
+        color: good ? "var(--good)" : "var(--bad)",
+      }}
+    >
+      {star && <Icon name="star" size={10} sw={2.2} />}
+      {label} {pts > 0 ? `+${pts}` : pts}
+    </span>
+  );
+}
+
+function sideLabel(b: SideBet): string {
+  if (b.market === "btts") return `BTTS ${b.pick === "yes" ? "Y" : "N"}`;
+  return `${b.pick === "over" ? "O" : "U"}${b.line ?? ""}`;
+}
+
 export function CompactPredictionRow({
   match,
   pred,
   last,
   ownerName,
+  sideBets,
+  joker,
 }: {
   match: MatchWithTeams;
   pred: Prediction;
   last?: boolean;
   ownerName?: string;
+  sideBets?: SideBet[];
+  joker?: JokerPick | null;
 }) {
   const settled = match.status === "final" && match.home_score != null && match.away_score != null;
   const actual = actualOutcomeForMatch(match);
@@ -111,6 +142,20 @@ export function CompactPredictionRow({
               <Countdown kickoff={match.kickoff_at} variant="labeled" lockLabel="Locks in" />
             )}
           </div>
+
+          {/* settled gamble outcomes */}
+          {settled && ((sideBets && sideBets.length > 0) || (joker && joker.scored)) && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(sideBets ?? [])
+                .filter((b) => b.scored)
+                .map((b) => (
+                  <GambleChip key={b.id} label={sideLabel(b)} pts={b.points_awarded} />
+                ))}
+              {joker && joker.scored && (
+                <GambleChip label="Joker" pts={joker.points_awarded} star />
+              )}
+            </div>
+          )}
         </div>
 
         {settled ? (

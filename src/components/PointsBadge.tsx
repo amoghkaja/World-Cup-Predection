@@ -7,11 +7,15 @@ export function PointsBadge({
 }: {
   pts: number;
   size?: "md" | "lg";
-  state?: "miss";
+  state?: "miss" | "penalty";
 }) {
   const big = size === "lg";
-  const bg = state === "miss" ? "var(--surface-2)" : "var(--gold-soft)";
-  const fg = state === "miss" ? "var(--text-3)" : "var(--on-gold)";
+  // A negative total is always a penalty (red), regardless of the passed state.
+  const penalty = state === "penalty" || pts < 0;
+  const miss = state === "miss" && !penalty;
+  const bg = penalty ? "var(--bad-soft)" : miss ? "var(--surface-2)" : "var(--gold-soft)";
+  const fg = penalty ? "var(--bad)" : miss ? "var(--text-3)" : "var(--on-gold)";
+  const iconColor = penalty ? "var(--bad)" : miss ? "var(--text-3)" : "var(--gold-strong)";
   return (
     <span
       className="inline-flex items-center"
@@ -25,12 +29,7 @@ export function PointsBadge({
         fontVariantNumeric: "tabular-nums",
       }}
     >
-      <Icon
-        name="bolt"
-        size={big ? 16 : 13}
-        sw={2.4}
-        style={{ color: state === "miss" ? "var(--text-3)" : "var(--gold-strong)" }}
-      />
+      <Icon name="bolt" size={big ? 16 : 13} sw={2.4} style={{ color: iconColor }} />
       <span style={{ fontSize: big ? 18 : 13.5 }}>
         {pts > 0 ? "+" : ""}
         {pts}

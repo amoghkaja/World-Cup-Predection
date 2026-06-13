@@ -4,14 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createStaticClient } from "@/lib/supabase/static";
 import type {
   GroupPrediction,
+  JokerPick,
   LeaderboardRow,
   MatchWithTeams,
   PodiumPrediction,
   Prediction,
   Profile,
+  SideBet,
   Team,
   TournamentPrediction,
 } from "@/lib/types";
+import { featuresActiveFor } from "@/lib/scoring";
 
 export type PodiumWindows = {
   firstKickoff: string | null;
@@ -166,6 +169,77 @@ export const getMyPredictions = cache(async (): Promise<Map<number, Prediction>>
   const { data } = await supabase.from("predictions").select("*").eq("user_id", user.id);
   (data ?? []).forEach((p) => map.set((p as Prediction).match_id, p as Prediction));
   return map;
+});
+
+// Per-user side bets, keyed `${matchId}:${market}`. Request-scoped cache only —
+// never unstable_cache (would leak one player's bets to another).
+export const getMySideBets = cache(async (): Promise<Map<string, SideBet>> => {
+  const user = await getCurrentUser();
+  const map = new Map<string, SideBet>();
+  if (!user) return map;
+  const supabase = await createClient();
+  const { data } = await supabase.from("side_bets").select("*").eq("user_id", user.id);
+  (data ?? []).forEach((b) => map.set(`${(b as SideBet).match_id}:${(b as SideBet).market}`, b as SideBet));
+  return map;
+});
+
+// Per-user jokers, keyed by match id; plus the set of canonical days already used.
+export const getMyJokers = cache(
+  async (): Promise<{ byMatch: Map<number, JokerPick>; days: Set<string> }> => {
+    const user = await getCurrentUser();
+    const byMatch = new Map<number, JokerPick>();
+    const days = new Set<string>();
+    if (!user) return { byMatch, days };
+    const supabase = await createClient();
+    const { data } = await supabase.from("joker_picks").select("*").eq("user_id", user.id);
+    (data ?? []).forEach((j) => {
+      byMatch.set((j as JokerPick).match_id, j as JokerPick);
+      days.add((j as JokerPick).joker_day);
+    });
+    return { byMatch, days };
+  }
+);
+
+/**
+ * Current streak for the badge. The run is "alive" only if the user extended it
+ * on the MOST RECENT settled eligible match — a miss or a skip writes no
+ * streak_bonuses row for that match, so the streak is 0 even though earlier
+ * (banked) bonus rows still exist.
+ */
+export const getMyStreak = cache(async (): Promise<number> => {
+  const user = await getCurrentUser();
+  if (!user) return 0;
+
+  const all = await getMatches(); // ordered by kickoff
+  const latestSettled = [...all]
+    .reverse()
+    .find(
+      (m) =>
+        m.status === "final" &&
+        m.home_score != null &&
+        featuresActiveFor(m.kickoff_at)
+    );
+  if (!latestSettled) return 0;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("streak_bonuses")
+    .select("streak_len")
+    .eq("user_id", user.id)
+    .eq("match_id", latestSettled.id)
+    .maybeSingle();
+  return (data as { streak_len: number } | null)?.streak_len ?? 0;
+});
+
+/** Canonical days on which the current user landed a perfect matchday (for the badge). */
+export const getMyPerfectDays = cache(async (): Promise<Set<string>> => {
+  const user = await getCurrentUser();
+  const set = new Set<string>();
+  if (!user) return set;
+  const supabase = await createClient();
+  const { data } = await supabase.from("perfect_days").select("day").eq("user_id", user.id);
+  (data ?? []).forEach((r) => set.add((r as { day: string }).day));
+  return set;
 });
 
 export async function getMyGroupPredictions(): Promise<Map<string, GroupPrediction>> {

@@ -3,14 +3,23 @@ import {
   getLeaderboard,
   getMatches,
   getMyPredictions,
+  getMySideBets,
+  getMyJokers,
+  getMyStreak,
   getProfile,
   getSetupStatus,
   tournamentLockAt,
 } from "@/lib/queries";
 import { isLocked, serverNow } from "@/lib/format";
+import { featuresActiveFor } from "@/lib/scoring";
 import { getViewerTimeZone } from "@/lib/tz";
 import { maybeKickResultsSync } from "@/lib/autosync";
-import { DashboardMatchList, type FeedMatch, type FeedPick } from "@/components/MatchCard";
+import {
+  DashboardMatchList,
+  type FeedMatch,
+  type FeedPick,
+} from "@/components/MatchCard";
+import { type SideState } from "@/components/SideBetControls";
 import { Icon } from "@/components/Icon";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
@@ -18,15 +27,19 @@ import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [matches, preds, profile, setup, lockAt, board, tz] = await Promise.all([
-    getMatches(),
-    getMyPredictions(),
-    getProfile(),
-    getSetupStatus(),
-    tournamentLockAt(),
-    getLeaderboard(),
-    getViewerTimeZone(),
-  ]);
+  const [matches, preds, profile, setup, lockAt, board, tz, sideBets, jokers, streak] =
+    await Promise.all([
+      getMatches(),
+      getMyPredictions(),
+      getProfile(),
+      getSetupStatus(),
+      tournamentLockAt(),
+      getLeaderboard(),
+      getViewerTimeZone(),
+      getMySideBets(),
+      getMyJokers(),
+      getMyStreak(),
+    ]);
   const now = serverNow();
 
   // A kicked-off match without a result yet? Chase it (post-response).
@@ -71,9 +84,11 @@ export default async function DashboardPage() {
       : null,
     homePh: m.home_placeholder,
     awayPh: m.away_placeholder,
+    eligible: featuresActiveFor(m.kickoff_at),
   }));
+  const upcomingIds = new Set(upcoming.map((m) => m.id));
   const picks: [number, FeedPick][] = [...preds.values()]
-    .filter((p) => upcoming.some((m) => m.id === p.match_id))
+    .filter((p) => upcomingIds.has(p.match_id))
     .map((p) => [
       p.match_id,
       {
@@ -84,6 +99,22 @@ export default async function DashboardPage() {
         scored: p.scored,
       },
     ]);
+
+  // Side bets + joker for the shown (upcoming) matches.
+  const sideByMatch = new Map<number, SideState>();
+  for (const b of sideBets.values()) {
+    if (!upcomingIds.has(b.match_id)) continue;
+    const s = sideByMatch.get(b.match_id) ?? {};
+    if (b.market === "btts") s.btts = b.pick === "yes" ? "yes" : "no";
+    else {
+      s.ouPick = b.pick === "over" ? "over" : "under";
+      s.ouLine = b.line == null ? null : Number(b.line);
+    }
+    sideByMatch.set(b.match_id, s);
+  }
+  const sides: [number, SideState][] = [...sideByMatch.entries()];
+  const jokerMatches = [...jokers.byMatch.keys()].filter((id) => upcomingIds.has(id));
+  const jokerDays = [...jokers.days];
 
   // "While you were away" recap: every settled match the player had a pick on.
   // The client only surfaces ones it hasn't shown before.
@@ -114,11 +145,12 @@ export default async function DashboardPage() {
     });
 
   const my = board.find((r) => r.user_id === profile?.id);
-  const stats: { value: string; label: string; gold?: boolean }[] = [
+  const stats: { value: string; label: string; gold?: boolean; flame?: boolean }[] = [
     { value: my ? `#${my.rank}` : "—", label: "Rank" },
     { value: my ? String(my.total_points) : "—", label: "Points" },
     { value: gated ? "—" : String(toPick), label: "To pick", gold: !gated && toPick > 0 },
   ];
+  if (streak > 0) stats.push({ value: String(streak), label: "Streak", gold: true, flame: true });
 
   return (
     <div className="flex flex-col" style={{ gap: 16 }}>
@@ -139,15 +171,17 @@ export default async function DashboardPage() {
               style={{ padding: "0 16px", borderLeft: i ? "1px solid var(--line)" : "none" }}
             >
               <div
-                className="tnum"
+                className="tnum inline-flex items-center"
                 style={{
                   fontFamily: "var(--font-display)",
                   fontWeight: 800,
                   fontStretch: "108%",
                   fontSize: 20,
+                  gap: 3,
                   color: s.gold ? "var(--gold-strong)" : "var(--text)",
                 }}
               >
+                {s.flame && <Icon name="flame" size={16} sw={2} />}
                 {s.value}
               </div>
               <div className="t-xs" style={{ color: "var(--text-3)", fontSize: 11 }}>
@@ -246,7 +280,15 @@ export default async function DashboardPage() {
           )}
 
           {/* filterable, day-grouped match list (upcoming + live only) */}
-          <DashboardMatchList matches={feed} picks={picks} toPickCount={toPick} tz={tz} />
+          <DashboardMatchList
+            matches={feed}
+            picks={picks}
+            toPickCount={toPick}
+            tz={tz}
+            sides={sides}
+            jokerMatches={jokerMatches}
+            jokerDays={jokerDays}
+          />
 
           {/* finished games live in Results & Tables */}
           {finishedCount > 0 && (

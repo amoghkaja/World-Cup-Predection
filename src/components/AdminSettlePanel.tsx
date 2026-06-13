@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from "react";
 import type { Team } from "@/lib/types";
-import { settleGroup, settleGoldenBoot, settlePodium } from "@/app/actions";
+import {
+  settleGroup,
+  settleGoldenBoot,
+  settlePodium,
+  recomputeFeatureScoring,
+} from "@/app/actions";
 import { PlayerCombobox } from "./PlayerCombobox";
 
 const GROUP_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
@@ -65,6 +70,23 @@ export function AdminSettlePanel({
           onClick={() => run("Podium", () => settlePodium())}
         >
           Re-settle podium
+        </button>
+      </div>
+
+      {/* Side bets / joker / streak / perfect-day backfill */}
+      <div className="card p-3.5 flex items-center justify-between gap-3 flex-wrap">
+        <div className="t-sm" style={{ color: "var(--text-2)", maxWidth: 360 }}>
+          Side bets, joker, streaks &amp; perfect days settle automatically. Run this once after
+          launch (or after changing the scoring constants) to (re)compute them across already-played
+          matches.
+        </div>
+        <button
+          className="btn btn-ghost"
+          style={{ padding: "9px 14px", fontSize: 14 }}
+          disabled={pending}
+          onClick={() => run("Recompute features", () => recomputeFeatureScoring())}
+        >
+          Recompute new features
         </button>
       </div>
 

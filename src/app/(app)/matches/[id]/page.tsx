@@ -1,16 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMatch, getMyPredictions, getSetupStatus } from "@/lib/queries";
+import { getMatch, getMyPredictions, getMySideBets, getMyJokers, getSetupStatus } from "@/lib/queries";
 import { isLocked } from "@/lib/format";
 import { getViewerTimeZone } from "@/lib/tz";
 import { LocalTime } from "@/components/LocalTime";
-import { OUTCOME_POINTS, EXACT_BONUS, maxPointsForStage } from "@/lib/scoring";
+import {
+  OUTCOME_POINTS,
+  EXACT_BONUS,
+  maxPointsForStage,
+  featuresActiveFor,
+} from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/TeamBadge";
 import { Countdown } from "@/components/Countdown";
 import { StatusPill } from "@/components/StatusPill";
 import { PredictionForm } from "@/components/PredictionForm";
+import { SideBetControls, type SideState } from "@/components/SideBetControls";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +25,13 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const matchId = Number(id);
   if (!Number.isFinite(matchId)) notFound();
 
-  const [match, preds, setup, tz] = await Promise.all([
+  const [match, preds, setup, tz, sideBets, jokers] = await Promise.all([
     getMatch(matchId),
     getMyPredictions(),
     getSetupStatus(),
     getViewerTimeZone(),
+    getMySideBets(),
+    getMyJokers(),
   ]);
   if (!match) notFound();
 
@@ -31,6 +39,25 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const locked = isLocked(match.kickoff_at);
   const open = !locked && match.status !== "final";
   const gated = open && !setup.complete;
+  const sideEligible = featuresActiveFor(match.kickoff_at);
+
+  // Current side-bet + joker state for this match.
+  const bttsBet = sideBets.get(`${match.id}:btts`);
+  const ouBet = sideBets.get(`${match.id}:ou`);
+  const sideState: SideState = {
+    btts: bttsBet ? (bttsBet.pick === "yes" ? "yes" : "no") : null,
+    ouPick: ouBet ? (ouBet.pick === "over" ? "over" : "under") : null,
+    ouLine: ouBet?.line == null ? null : Number(ouBet.line),
+  };
+  const jokerOnMatch = jokers.byMatch.has(match.id);
+  const TOURN_DAY = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const jokerUsedElsewhere =
+    !jokerOnMatch && jokers.days.has(TOURN_DAY.format(new Date(match.kickoff_at)));
   const status: "open" | "live" | "done" | "locked" =
     match.status === "final" && match.home_score != null
       ? "done"
@@ -197,6 +224,16 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             </span>
           </div>
           <PredictionForm match={match} existing={existing} locked={!open} />
+          {sideEligible && open && (
+            <div style={{ borderTop: "1px dashed var(--line)", marginTop: 14, paddingTop: 10 }}>
+              <SideBetControls
+                matchId={match.id}
+                side={sideState}
+                joker={jokerOnMatch}
+                jokerUsedElsewhere={jokerUsedElsewhere}
+              />
+            </div>
+          )}
         </div>
       )}
 
