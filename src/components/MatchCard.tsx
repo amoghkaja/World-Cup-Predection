@@ -54,10 +54,13 @@ export function MatchRow({
   m,
   pick,
   divider,
+  tz,
 }: {
   m: FeedMatch;
   pick: FeedPick | null;
   divider: boolean;
+  /** Viewer's IANA timezone — kickoff clock renders in it server-side. */
+  tz: string | null;
 }) {
   const locked = isLocked(m.kickoff);
   const open = !locked && m.status === "scheduled";
@@ -144,7 +147,7 @@ export function MatchRow({
             </span>
           ) : (
             <span className="tnum" style={{ fontWeight: 700, fontSize: 13 }}>
-              <LocalKickoff iso={m.kickoff} />
+              <LocalKickoff iso={m.kickoff} tz={tz} />
             </span>
           )}
           <span className="t-xs" style={{ color: "var(--text-3)", fontSize: 10.5 }}>
@@ -309,7 +312,7 @@ export function DashboardMatchList({
             }}
           >
             {ms.map((m, i) => (
-              <MatchRow key={m.id} m={m} pick={pickMap.get(m.id) ?? null} divider={i > 0} />
+              <MatchRow key={m.id} m={m} pick={pickMap.get(m.id) ?? null} divider={i > 0} tz={tz} />
             ))}
           </div>
         </section>

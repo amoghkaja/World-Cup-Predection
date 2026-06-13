@@ -253,7 +253,7 @@ export function ResultsExplorer({
                         </span>
                       ) : (
                         <span className="t-xs tnum" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-                          <LocalKickoff iso={m.kickoff_at} />
+                          <LocalKickoff iso={m.kickoff_at} tz={tz} />
                         </span>
                       )}
                       <span
