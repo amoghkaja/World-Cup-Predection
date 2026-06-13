@@ -114,10 +114,12 @@ export function scorePodium(position: number, correct: boolean, revised: boolean
    main pick. Main picks are unchanged (a wrong pick = 0).
    ============================================================ */
 
-export type SideBetMarket = "btts" | "ou";
-export type SideBetPick = "yes" | "no" | "over" | "under";
+export type SideBetPick = "yes" | "no";
 
-// --- Both teams to score: a true ~50/50, so a flat (slightly inviting) payout.
+// --- Both teams to score: a true ~50/50 in almost every match, so a flat
+// (slightly inviting) payout. The only side bet — Over/Under was dropped because
+// without per-match odds it mispriced lopsided games and the safe lines were
+// mildly farmable.
 export const BTTS_REWARD = 3;
 export const BTTS_PENALTY = -2;
 
@@ -125,64 +127,9 @@ export function actualBtts(home: number, away: number): "yes" | "no" {
   return home > 0 && away > 0 ? "yes" : "no";
 }
 
-// --- Over/Under: the player picks the half-line AND the side. The payout scales
-// with the odds so a near-certain line ("over 0.5") can't be farmed: it pays a
-// trickle on a win but costs a lot on the rare miss.
-export const OU_MIN_LINE = 0.5;
-export const OU_MAX_LINE = 6.5;
-export const OU_K = 6;
-
-// Rough P(total goals > n) for a World Cup match (Poisson λ≈2.6, hand-tuned).
-const P_OVER: Record<number, number> = {
-  0: 0.94, 1: 0.8, 2: 0.57, 3: 0.35, 4: 0.18, 5: 0.08, 6: 0.04,
-};
-
-/** Estimated win probability of an over/under bet at a given half-line. */
-export function ouWinProbability(pick: "over" | "under", line: number): number {
-  const n = Math.max(0, Math.min(6, Math.floor(line)));
-  const pOver = P_OVER[n] ?? 0.02;
-  return pick === "over" ? pOver : 1 - pOver;
-}
-
-/** A valid O/U line is a half-line (x.5) inside the allowed band. */
-export function isValidOuLine(line: number): boolean {
-  return (
-    Number.isFinite(line) &&
-    line >= OU_MIN_LINE &&
-    line <= OU_MAX_LINE &&
-    Math.round(line * 2) % 2 === 1 // odd half-integer ⇒ x.5
-  );
-}
-
-/** What a winning / losing O/U bet at this line is worth (for display + scoring). */
-export function ouPayout(pick: "over" | "under", line: number): { win: number; loss: number } {
-  const p = ouWinProbability(pick, line);
-  return {
-    win: Math.max(1, Math.round(OU_K * (1 - p))),
-    loss: -Math.max(1, Math.round(OU_K * p)),
-  };
-}
-
-function scoreOverUnder(pick: "over" | "under", line: number, home: number, away: number): number {
-  const total = home + away;
-  if (total === line) return 0; // push (only on a whole-number line; UI uses half-lines)
-  const won = pick === "over" ? total > line : total < line;
-  const { win, loss } = ouPayout(pick, line);
-  return won ? win : loss;
-}
-
 /** Points for one settled side bet, from the stored full-time score. */
-export function scoreSideBet(
-  market: SideBetMarket,
-  pick: SideBetPick,
-  line: number | null,
-  home: number,
-  away: number
-): number {
-  if (market === "btts") {
-    return pick === actualBtts(home, away) ? BTTS_REWARD : BTTS_PENALTY;
-  }
-  return scoreOverUnder(pick === "under" ? "under" : "over", line ?? 2.5, home, away);
+export function scoreSideBet(pick: SideBetPick, home: number, away: number): number {
+  return pick === actualBtts(home, away) ? BTTS_REWARD : BTTS_PENALTY;
 }
 
 // --- Joker / double-down: doubles a correct main pick (pays its base points
@@ -214,12 +161,19 @@ export function perfectDayBonus(correctPicks: number): number {
   return PERFECT_DAY_BASE + PERFECT_DAY_PER_MATCH * correctPicks;
 }
 
-// --- Activation cutoff: side bets & joker are offered only for matches kicking
-// off at/after this (set to the first kickoff once every team has played once).
-// Authoritative gate is the SQL feature_cutoff(); this is for UI/pre-checks.
+// --- Activation cutoff. The controls show on every open match immediately but
+// stay LOCKED until this moment; after it, they're usable. It's also the point
+// from which streak / perfect-day / settlement count. Authoritative gate is the
+// SQL feature_cutoff(); this mirrors it for UI + pre-checks.
 export const FEATURE_CUTOFF_ISO =
-  process.env.NEXT_PUBLIC_FEATURE_CUTOFF ?? "2026-06-18T16:00:00Z";
+  process.env.NEXT_PUBLIC_FEATURE_CUTOFF ?? "2026-06-14T22:00:00Z"; // Mon 15 Jun 00:00 CEST
 
+/** Have the new features unlocked yet (now ≥ cutoff)? Gates placing bets. */
+export function featuresLive(now: number = Date.now()): boolean {
+  return now >= new Date(FEATURE_CUTOFF_ISO).getTime();
+}
+
+/** Is a match within feature scope (kicks off at/after the cutoff)? For scoring. */
 export function featuresActiveFor(kickoffIso: string): boolean {
   return new Date(kickoffIso).getTime() >= new Date(FEATURE_CUTOFF_ISO).getTime();
 }

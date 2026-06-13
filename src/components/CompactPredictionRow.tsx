@@ -58,8 +58,7 @@ function GambleChip({ label, pts, star }: { label: string; pts: number; star?: b
 }
 
 function sideLabel(b: SideBet): string {
-  if (b.market === "btts") return `BTTS ${b.pick === "yes" ? "Y" : "N"}`;
-  return `${b.pick === "over" ? "O" : "U"}${b.line ?? ""}`;
+  return `BTTS ${b.pick === "yes" ? "Y" : "N"}`;
 }
 
 export function CompactPredictionRow({

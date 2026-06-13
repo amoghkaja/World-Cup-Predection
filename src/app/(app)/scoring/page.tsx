@@ -12,7 +12,6 @@ import {
   PERFECT_DAY_BASE,
   PERFECT_DAY_PER_MATCH,
   PERFECT_DAY_MIN_PICKS,
-  ouPayout,
 } from "@/lib/scoring";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -413,35 +412,11 @@ export default function ScoringPage() {
 
         <div className="flex flex-col gap-2.5">
           {/* BTTS */}
-          <Row title="Both teams to score?" desc="A coin-flip yes/no call.">
+          <Row title="Both teams to score?" desc="A coin-flip yes/no call on any match.">
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{BTTS_REWARD}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
             <span style={{ color: "var(--bad)", fontWeight: 800 }}>{BTTS_PENALTY}</span>
           </Row>
-
-          {/* Over/Under odds table */}
-          <div style={{ padding: "11px 13px", borderRadius: 12, background: "var(--surface-2)" }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Over / Under — you pick the line</div>
-            <div className="t-xs" style={{ color: "var(--text-3)", marginBottom: 8 }}>
-              Payout scales with the odds: safe lines pay little, bold lines pay big (and cost more if
-              they miss).
-            </div>
-            <div className="flex flex-col" style={{ gap: 4 }}>
-              {[0.5, 1.5, 2.5, 3.5, 4.5].map((l) => {
-                const o = ouPayout("over", l);
-                return (
-                  <div key={l} className="flex items-center justify-between tnum" style={{ fontSize: 13 }}>
-                    <span style={{ color: "var(--text-2)" }}>Over {l}</span>
-                    <span>
-                      <span style={{ color: "var(--good)", fontWeight: 700 }}>win +{o.win}</span>
-                      <span style={{ color: "var(--text-3)" }}> · </span>
-                      <span style={{ color: "var(--bad)", fontWeight: 700 }}>miss {o.loss}</span>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Joker */}
           <Row title="Joker / double-down" desc="One per day. Stake it on a match.">

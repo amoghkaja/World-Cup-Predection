@@ -84,9 +84,7 @@ export interface SideBet {
   id: number;
   user_id: string;
   match_id: number;
-  market: "btts" | "ou";
-  pick: "yes" | "no" | "over" | "under";
-  line: number | null;
+  pick: "yes" | "no"; // both-teams-to-score
   submitted_at: string;
   points_awarded: number;
   scored: boolean;

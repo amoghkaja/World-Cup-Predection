@@ -10,8 +10,8 @@ import {
   getSetupStatus,
   tournamentLockAt,
 } from "@/lib/queries";
-import { isLocked, serverNow } from "@/lib/format";
-import { featuresActiveFor } from "@/lib/scoring";
+import { isLocked, serverNow, zonedDayLabel } from "@/lib/format";
+import { featuresLive, FEATURE_CUTOFF_ISO } from "@/lib/scoring";
 import { getViewerTimeZone } from "@/lib/tz";
 import { maybeKickResultsSync } from "@/lib/autosync";
 import {
@@ -84,8 +84,9 @@ export default async function DashboardPage() {
       : null,
     homePh: m.home_placeholder,
     awayPh: m.away_placeholder,
-    eligible: featuresActiveFor(m.kickoff_at),
   }));
+  const live = featuresLive(now);
+  const unlockLabel = zonedDayLabel(FEATURE_CUTOFF_ISO, tz);
   const upcomingIds = new Set(upcoming.map((m) => m.id));
   const picks: [number, FeedPick][] = [...preds.values()]
     .filter((p) => upcomingIds.has(p.match_id))
@@ -100,19 +101,10 @@ export default async function DashboardPage() {
       },
     ]);
 
-  // Side bets + joker for the shown (upcoming) matches.
-  const sideByMatch = new Map<number, SideState>();
-  for (const b of sideBets.values()) {
-    if (!upcomingIds.has(b.match_id)) continue;
-    const s = sideByMatch.get(b.match_id) ?? {};
-    if (b.market === "btts") s.btts = b.pick === "yes" ? "yes" : "no";
-    else {
-      s.ouPick = b.pick === "over" ? "over" : "under";
-      s.ouLine = b.line == null ? null : Number(b.line);
-    }
-    sideByMatch.set(b.match_id, s);
-  }
-  const sides: [number, SideState][] = [...sideByMatch.entries()];
+  // Side bets (BTTS) + joker for the shown (upcoming) matches.
+  const sides: [number, SideState][] = [...sideBets.values()]
+    .filter((b) => upcomingIds.has(b.match_id))
+    .map((b) => [b.match_id, { btts: b.pick === "yes" ? "yes" : "no" }]);
   const jokerMatches = [...jokers.byMatch.keys()].filter((id) => upcomingIds.has(id));
   const jokerDays = [...jokers.days];
 
@@ -288,6 +280,8 @@ export default async function DashboardPage() {
             sides={sides}
             jokerMatches={jokerMatches}
             jokerDays={jokerDays}
+            live={live}
+            unlockLabel={unlockLabel}
           />
 
           {/* finished games live in Results & Tables */}

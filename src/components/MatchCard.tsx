@@ -27,8 +27,6 @@ export type FeedMatch = {
   away: FeedTeam | null;
   homePh: string | null;
   awayPh: string | null;
-  /** side bets + joker are offered (kickoff ≥ the activation cutoff) */
-  eligible: boolean;
 };
 export type FeedPick = {
   h: number;
@@ -70,6 +68,8 @@ export function MatchRow({
   side,
   jokerOnMatch,
   jokerUsedElsewhere,
+  live,
+  unlockLabel,
 }: {
   m: FeedMatch;
   pick: FeedPick | null;
@@ -79,6 +79,8 @@ export function MatchRow({
   side: SideState;
   jokerOnMatch: boolean;
   jokerUsedElsewhere: boolean;
+  live: boolean;
+  unlockLabel?: string;
 }) {
   const locked = isLocked(m.kickoff);
   const open = !locked && m.status === "scheduled";
@@ -87,7 +89,7 @@ export function MatchRow({
   // waiting on the results feed — saying LIVE would be a lie.
   const maxLiveMs = (m.stage === "group" ? 150 : 195) * 60_000;
   const ended = locked && m.status !== "final" && elapsedSince(m.kickoff, maxLiveMs);
-  const live = !ended && (m.status === "live" || (locked && m.status === "scheduled"));
+  const inPlay = !ended && (m.status === "live" || (locked && m.status === "scheduled"));
   const [editing, setEditing] = useState(false);
 
   const teamLine = (t: FeedTeam | null, ph: string | null) => (
@@ -154,7 +156,7 @@ export function MatchRow({
       >
         {/* kickoff time */}
         <span className="flex flex-col items-center" style={{ width: 56, flex: "none", gap: 2 }}>
-          {live ? (
+          {inPlay ? (
             <span className="pill pill-live" style={{ fontSize: 10 }}>
               <span className="dot-live" />
               LIVE
@@ -243,13 +245,15 @@ export function MatchRow({
             onSaved={() => setEditing(false)}
           />
 
-          {m.eligible && open && (
+          {open && (
             <div style={{ borderTop: "1px dashed var(--line)", paddingTop: 4 }}>
               <SideBetControls
                 matchId={m.id}
                 side={side}
                 joker={jokerOnMatch}
                 jokerUsedElsewhere={jokerUsedElsewhere}
+                live={live}
+                unlockLabel={unlockLabel}
               />
             </div>
           )}
@@ -270,6 +274,8 @@ export function DashboardMatchList({
   sides = [],
   jokerMatches = [],
   jokerDays = [],
+  live = false,
+  unlockLabel,
 }: {
   matches: FeedMatch[];
   /** [matchId, pick] entries (Maps aren't serializable across the RSC boundary) */
@@ -284,6 +290,9 @@ export function DashboardMatchList({
   jokerMatches?: number[];
   /** canonical tournament days a joker is already used on */
   jokerDays?: string[];
+  /** have the gambles unlocked yet? (controls show locked until then) */
+  live?: boolean;
+  unlockLabel?: string;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const pickMap = useMemo(() => new Map(picks), [picks]);
@@ -367,6 +376,8 @@ export function DashboardMatchList({
                   side={sideMap.get(m.id) ?? {}}
                   jokerOnMatch={jokerOnMatch}
                   jokerUsedElsewhere={!jokerOnMatch && jokerDaySet.has(tournDay(m.kickoff))}
+                  live={live}
+                  unlockLabel={unlockLabel}
                 />
               );
             })}

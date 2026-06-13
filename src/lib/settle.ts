@@ -7,7 +7,6 @@ import {
   streakBonusFor,
   perfectDayBonus,
   PERFECT_DAY_MIN_PICKS,
-  type SideBetMarket,
   type SideBetPick,
 } from "@/lib/scoring";
 import type { Match } from "@/lib/types";
@@ -44,13 +43,7 @@ export async function settleMatchSideEffects(admin: Admin, match: Match): Promis
   // --- side bets ---
   const { data: bets } = await admin.from("side_bets").select("*").eq("match_id", match.id);
   await inChunks(bets ?? [], async (b) => {
-    const pts = scoreSideBet(
-      b.market as SideBetMarket,
-      b.pick as SideBetPick,
-      b.line == null ? null : Number(b.line),
-      home,
-      away
-    );
+    const pts = scoreSideBet(b.pick as SideBetPick, home, away);
     await admin.from("side_bets").update({ points_awarded: pts, scored: true }).eq("id", b.id);
   });
 
