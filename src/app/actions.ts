@@ -13,11 +13,9 @@ import { isLocked } from "@/lib/format";
 import {
   scorePrediction,
   scorePodium,
-  featuresActiveFor,
-  isValidOuLine,
+  featuresLive,
   GROUP_QUALIFIER_POINTS,
   GOLDEN_BOOT_POINTS,
-  type SideBetMarket,
   type SideBetPick,
 } from "@/lib/scoring";
 import { settleMatchSideEffects, recomputeStreaksAndPerfectDays } from "@/lib/settle";
@@ -120,44 +118,28 @@ export async function savePrediction(input: {
   }
 }
 
-// ---------------- Side bets (opt-in gambles) ----------------
+// ---------------- Side bet: Both teams to score (opt-in gamble) ----------------
 export async function saveSideBet(input: {
   matchId: number;
-  market: SideBetMarket;
   pick: SideBetPick;
-  line?: number | null;
 }): Promise<Result> {
   try {
     const { supabase } = await requireUser();
 
     if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
-    if (input.market !== "btts" && input.market !== "ou") {
-      return { ok: false, error: "Invalid market" };
-    }
-    const okPick =
-      input.market === "btts"
-        ? input.pick === "yes" || input.pick === "no"
-        : input.pick === "over" || input.pick === "under";
-    if (!okPick) return { ok: false, error: "Invalid pick" };
-    const line = input.market === "ou" ? input.line ?? null : null;
-    if (input.market === "ou" && (line == null || !isValidOuLine(line))) {
-      return { ok: false, error: "Pick a line between 0.5 and 6.5." };
-    }
+    if (input.pick !== "yes" && input.pick !== "no") return { ok: false, error: "Invalid pick" };
+
+    if (!featuresLive()) return { ok: false, error: "Side bets unlock Monday." };
 
     const match = await getMatch(input.matchId);
     if (!match) return { ok: false, error: "Match not found" };
-    if (!featuresActiveFor(match.kickoff_at)) {
-      return { ok: false, error: "Side bets aren't available for this match." };
-    }
     if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
       return { ok: false, error: "This match is locked — the deadline has passed." };
     }
 
     const { error } = await supabase.rpc("save_side_bet", {
       p_match_id: input.matchId,
-      p_market: input.market,
       p_pick: input.pick,
-      p_line: line,
     });
     if (error) {
       if (error.code === "42501" || /row-level security/i.test(error.message)) {
@@ -180,12 +162,10 @@ export async function saveJoker(input: { matchId: number }): Promise<Result> {
   try {
     const { supabase } = await requireUser();
     if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
+    if (!featuresLive()) return { ok: false, error: "The joker unlocks Monday." };
 
     const match = await getMatch(input.matchId);
     if (!match) return { ok: false, error: "Match not found" };
-    if (!featuresActiveFor(match.kickoff_at)) {
-      return { ok: false, error: "The joker isn't available for this match." };
-    }
     if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
       return { ok: false, error: "This match is locked — the deadline has passed." };
     }

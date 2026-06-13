@@ -11,11 +11,7 @@
 
 -- ---------- enums ----------
 do $$ begin
-  create type side_bet_market as enum ('btts','ou');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
-  create type side_bet_pick as enum ('yes','no','over','under');
+  create type side_bet_pick as enum ('yes','no');  -- both-teams-to-score
 exception when duplicate_object then null; end $$;
 
 -- ---------- helpers ----------
@@ -33,18 +29,16 @@ returns timestamptz
 language sql immutable
 as $$ select timestamptz '2026-06-18 16:00:00+00' $$;
 
--- ---------- side_bets ----------
+-- ---------- side_bets (both-teams-to-score) ----------
 create table if not exists public.side_bets (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.profiles(id) on delete cascade,
   match_id integer not null references public.matches(id) on delete cascade,
-  market side_bet_market not null,
   pick side_bet_pick not null,
-  line numeric,                       -- chosen Over/Under half-line; null for BTTS
   submitted_at timestamptz not null default now(),
   points_awarded integer not null default 0,
   scored boolean not null default false,
-  unique (user_id, match_id, market)  -- one BTTS + one O/U per match
+  unique (user_id, match_id)          -- one side bet per match
 );
 create index if not exists side_bets_match_idx on public.side_bets (match_id);
 create index if not exists side_bets_user_idx on public.side_bets (user_id);
@@ -112,36 +106,24 @@ revoke insert, update, delete on
   from authenticated, anon;
 
 -- ---------- RPCs (enforce cutoff + deadline + validity, like save_podium_pick) ----------
-create or replace function public.save_side_bet(
-  p_match_id integer, p_market side_bet_market, p_pick side_bet_pick, p_line numeric
-)
+create or replace function public.save_side_bet(p_match_id integer, p_pick side_bet_pick)
 returns void
 language plpgsql security definer set search_path = public
 as $$
 declare v_uid uuid := auth.uid(); v_ko timestamptz;
 begin
   if v_uid is null then raise exception 'Not authenticated'; end if;
+  if now() < public.feature_cutoff() then raise exception 'Side bets are not live yet'; end if;
   select kickoff_at into v_ko from public.matches where id = p_match_id;
   if v_ko is null then raise exception 'No such match'; end if;
-  if v_ko < public.feature_cutoff() then raise exception 'Side bets are not available for this match'; end if;
   if now() >= v_ko then raise exception 'This match is locked'; end if;
 
-  if p_market = 'btts' then
-    if p_pick not in ('yes','no') then raise exception 'Invalid BTTS pick'; end if;
-    p_line := null;
-  else -- 'ou'
-    if p_pick not in ('over','under') then raise exception 'Invalid over/under pick'; end if;
-    if p_line is null or p_line not in (0.5,1.5,2.5,3.5,4.5,5.5,6.5) then
-      raise exception 'Invalid over/under line';
-    end if;
-  end if;
-
-  insert into public.side_bets (user_id, match_id, market, pick, line, submitted_at, points_awarded, scored)
-  values (v_uid, p_match_id, p_market, p_pick, p_line, now(), 0, false)
-  on conflict (user_id, match_id, market) do update
-    set pick = excluded.pick, line = excluded.line, submitted_at = now();
+  insert into public.side_bets (user_id, match_id, pick, submitted_at, points_awarded, scored)
+  values (v_uid, p_match_id, p_pick, now(), 0, false)
+  on conflict (user_id, match_id) do update
+    set pick = excluded.pick, submitted_at = now();
 end $$;
-grant execute on function public.save_side_bet(integer, side_bet_market, side_bet_pick, numeric) to authenticated;
+grant execute on function public.save_side_bet(integer, side_bet_pick) to authenticated;
 
 create or replace function public.save_joker(p_match_id integer)
 returns void
@@ -150,9 +132,9 @@ as $$
 declare v_uid uuid := auth.uid(); v_ko timestamptz; v_day date;
 begin
   if v_uid is null then raise exception 'Not authenticated'; end if;
+  if now() < public.feature_cutoff() then raise exception 'The joker is not live yet'; end if;
   select kickoff_at into v_ko from public.matches where id = p_match_id;
   if v_ko is null then raise exception 'No such match'; end if;
-  if v_ko < public.feature_cutoff() then raise exception 'The joker is not available for this match'; end if;
   if now() >= v_ko then raise exception 'This match is locked'; end if;
   if not exists (select 1 from public.predictions where user_id = v_uid and match_id = p_match_id) then
     raise exception 'Make your match pick before playing the joker';

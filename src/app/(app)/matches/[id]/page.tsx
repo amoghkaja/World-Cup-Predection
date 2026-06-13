@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMatch, getMyPredictions, getMySideBets, getMyJokers, getSetupStatus } from "@/lib/queries";
-import { isLocked } from "@/lib/format";
+import { isLocked, zonedDayLabel } from "@/lib/format";
 import { getViewerTimeZone } from "@/lib/tz";
 import { LocalTime } from "@/components/LocalTime";
 import {
   OUTCOME_POINTS,
   EXACT_BONUS,
   maxPointsForStage,
-  featuresActiveFor,
+  featuresLive,
+  FEATURE_CUTOFF_ISO,
 } from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -39,15 +40,13 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const locked = isLocked(match.kickoff_at);
   const open = !locked && match.status !== "final";
   const gated = open && !setup.complete;
-  const sideEligible = featuresActiveFor(match.kickoff_at);
+  const live = featuresLive();
+  const unlockLabel = zonedDayLabel(FEATURE_CUTOFF_ISO, tz);
 
   // Current side-bet + joker state for this match.
-  const bttsBet = sideBets.get(`${match.id}:btts`);
-  const ouBet = sideBets.get(`${match.id}:ou`);
+  const bttsBet = sideBets.get(match.id);
   const sideState: SideState = {
     btts: bttsBet ? (bttsBet.pick === "yes" ? "yes" : "no") : null,
-    ouPick: ouBet ? (ouBet.pick === "over" ? "over" : "under") : null,
-    ouLine: ouBet?.line == null ? null : Number(ouBet.line),
   };
   const jokerOnMatch = jokers.byMatch.has(match.id);
   const TOURN_DAY = new Intl.DateTimeFormat("en-CA", {
@@ -224,13 +223,15 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             </span>
           </div>
           <PredictionForm match={match} existing={existing} locked={!open} />
-          {sideEligible && open && (
+          {open && (
             <div style={{ borderTop: "1px dashed var(--line)", marginTop: 14, paddingTop: 10 }}>
               <SideBetControls
                 matchId={match.id}
                 side={sideState}
                 joker={jokerOnMatch}
                 jokerUsedElsewhere={jokerUsedElsewhere}
+                live={live}
+                unlockLabel={unlockLabel}
               />
             </div>
           )}

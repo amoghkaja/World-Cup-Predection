@@ -1,18 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FEATURE_CUTOFF_ISO } from "@/lib/scoring";
+import { FEATURE_CUTOFF_ISO, featuresLive } from "@/lib/scoring";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 
-// Shown once after the new features go live. Replayable via the "What's new" event.
+// Shown once to announce the new features (before they unlock too, as a teaser).
+// Replayable via the "What's new" event.
 const KEY = "wc_features_v1";
+
+const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
+  weekday: "long",
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 const STEPS: { icon: string; title: string; body: string }[] = [
   {
     icon: "dice",
     title: "New: side bets",
-    body: "On every match you can now add two optional gambles — Both Teams To Score, and an Over/Under where you pick the goals line yourself. Call it right and you gain points; get it wrong and you lose them. Only bet when you're sure.",
+    body: "On every match you can now add an optional gamble — Both Teams To Score. Call it right and you gain points; get it wrong and you lose them. Only bet when you're sure.",
   },
   {
     icon: "star",
@@ -31,10 +40,9 @@ export function FeatureSplash() {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
-    const live = Date.now() >= new Date(FEATURE_CUTOFF_ISO).getTime();
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only localStorage check
-      if (live && !localStorage.getItem(KEY)) setOpen(true);
+      if (!localStorage.getItem(KEY)) setOpen(true);
     } catch {
       // localStorage unavailable — just don't auto-show.
     }
@@ -82,6 +90,25 @@ export function FeatureSplash() {
         <p className="t-body" style={{ color: "var(--text-2)" }}>
           {s.body}
         </p>
+
+        {!featuresLive() && (
+          <div
+            className="inline-flex items-center mx-auto"
+            style={{
+              gap: 6,
+              marginTop: 14,
+              padding: "7px 12px",
+              borderRadius: 999,
+              background: "var(--surface-2)",
+              color: "var(--text-2)",
+              fontSize: 12.5,
+              fontWeight: 650,
+            }}
+          >
+            <Icon name="lock" size={13} />
+            Unlocks {UNLOCK_LABEL}
+          </div>
+        )}
 
         <div className="flex items-center justify-center gap-1.5" style={{ margin: "18px 0" }}>
           {STEPS.map((_, i) => (

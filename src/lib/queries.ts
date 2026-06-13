@@ -171,15 +171,15 @@ export const getMyPredictions = cache(async (): Promise<Map<number, Prediction>>
   return map;
 });
 
-// Per-user side bets, keyed `${matchId}:${market}`. Request-scoped cache only —
-// never unstable_cache (would leak one player's bets to another).
-export const getMySideBets = cache(async (): Promise<Map<string, SideBet>> => {
+// Per-user side bets, keyed by match id (one BTTS bet per match). Request-scoped
+// cache only — never unstable_cache (would leak one player's bets to another).
+export const getMySideBets = cache(async (): Promise<Map<number, SideBet>> => {
   const user = await getCurrentUser();
-  const map = new Map<string, SideBet>();
+  const map = new Map<number, SideBet>();
   if (!user) return map;
   const supabase = await createClient();
   const { data } = await supabase.from("side_bets").select("*").eq("user_id", user.id);
-  (data ?? []).forEach((b) => map.set(`${(b as SideBet).match_id}:${(b as SideBet).market}`, b as SideBet));
+  (data ?? []).forEach((b) => map.set((b as SideBet).match_id, b as SideBet));
   return map;
 });
 
