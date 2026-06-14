@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { MatchStage, MatchStatus, PredOutcome } from "@/lib/types";
 import { elapsedSince, isLocked, zonedDayKey, zonedDayLabel } from "@/lib/format";
+import { maxPointsForStage } from "@/lib/scoring";
 import { Icon } from "./Icon";
 import { LocalKickoff } from "./LocalTime";
 import { Flag } from "./TeamBadge";
@@ -254,6 +255,7 @@ export function MatchRow({
                 jokerUsedElsewhere={jokerUsedElsewhere}
                 live={live}
                 unlockLabel={unlockLabel}
+                jokerUpside={maxPointsForStage(m.stage)}
               />
             </div>
           )}
