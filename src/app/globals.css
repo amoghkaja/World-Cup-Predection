@@ -236,7 +236,7 @@ h1, h2, h3, h4 {
   .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: livepulse 1.4s ease-in-out infinite; }
 
   .seg { display: inline-flex; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 3px; }
-  .seg-btn { border: none; background: transparent; color: var(--text-2); font-weight: 650; font-size: 13.5px; min-height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px; transition: background .15s, color .15s; cursor: pointer; }
+  .seg-btn { border: none; background: transparent; color: var(--text-2); font-weight: 650; font-size: 13.5px; min-height: 42px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px; transition: background .15s, color .15s; cursor: pointer; }
   .seg-btn.on { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
   .seg-count { background: var(--gold); color: var(--on-gold); border-radius: 999px; font-size: 11px; padding: 2px 7px; font-weight: 800; }
 

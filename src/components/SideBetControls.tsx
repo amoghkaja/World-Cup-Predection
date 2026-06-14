@@ -108,14 +108,14 @@ export function SideBetControls({
           onClick={() => setHelp(true)}
           className="grid place-items-center press"
           style={{
-            width: 26,
-            height: 26,
+            width: 34,
+            height: 34,
             borderRadius: 999,
             border: "1px solid var(--line)",
             background: "var(--surface)",
             color: "var(--text-3)",
             fontWeight: 800,
-            fontSize: 13,
+            fontSize: 14,
             flex: "none",
           }}
         >

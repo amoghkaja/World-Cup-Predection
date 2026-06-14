@@ -18,6 +18,7 @@ import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/TeamBadge";
 import { PointsBadge } from "@/components/PointsBadge";
 import { HowToPlayButton } from "@/components/HowToPlayButton";
+import { WhatsNewButton } from "@/components/WhatsNewButton";
 
 // Static explainer. Every number is pulled straight from @/lib/scoring so the
 // page can never drift from how points are actually awarded. No multiplier.
@@ -444,6 +445,9 @@ export default function ScoringPage() {
               +{PERFECT_DAY_BASE}&nbsp;+&nbsp;{PERFECT_DAY_PER_MATCH}/match
             </span>
           </Row>
+        </div>
+        <div className="text-center">
+          <WhatsNewButton />
         </div>
       </div>
     </div>
