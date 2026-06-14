@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveSideBet, saveJoker, clearJoker } from "@/app/actions";
-import { BTTS_REWARD, BTTS_PENALTY } from "@/lib/scoring";
+import { BTTS_REWARD, BTTS_PENALTY, JOKER_WRONG_PENALTY } from "@/lib/scoring";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 
@@ -20,6 +20,7 @@ export function SideBetControls({
   jokerUsedElsewhere,
   live,
   unlockLabel,
+  jokerUpside,
 }: {
   matchId: number;
   side: SideState;
@@ -30,6 +31,8 @@ export function SideBetControls({
   live: boolean;
   /** human label for when it unlocks, e.g. "Mon 15 Jun" */
   unlockLabel?: string;
+  /** max extra points the joker can add on this match (= its max main-pick haul) */
+  jokerUpside?: number;
 }) {
   const [btts, setBtts] = useState<"yes" | "no" | null>(side.btts ?? null);
   const [jok, setJok] = useState(joker);
@@ -166,6 +169,18 @@ export function SideBetControls({
         )}
       </button>
 
+      {/* joker stakes — make the downside explicit before they commit */}
+      <div
+        className="flex items-center justify-center tnum"
+        style={{ gap: 8, marginTop: -4, fontSize: 11.5, fontWeight: 700 }}
+      >
+        <span style={{ color: "var(--good)" }}>
+          ✓ doubles{jokerUpside ? ` (up to +${jokerUpside})` : ""}
+        </span>
+        <span style={{ color: "var(--text-3)" }}>·</span>
+        <span style={{ color: "var(--bad)" }}>✗ {JOKER_WRONG_PENALTY} pts if wrong</span>
+      </div>
+
       {err && (
         <p role="alert" className="t-xs" style={{ color: "var(--bad)", fontWeight: 650 }}>
           {err}
@@ -184,7 +199,7 @@ export function SideBetControls({
             <div className="flex flex-col gap-2">
               {[
                 ["Both teams to score", `A coin-flip yes/no call — win +${BTTS_REWARD}, miss ${BTTS_PENALTY}.`],
-                ["Joker", "One per day. Stake it on a match: if your main pick is right it pays double, if it's wrong you lose points."],
+                ["Joker", `One per day. If your main pick is right it pays double${jokerUpside ? ` (up to +${jokerUpside} extra here)` : ""}; if it's wrong you lose ${Math.abs(JOKER_WRONG_PENALTY)} points.`],
               ].map(([t, d]) => (
                 <div key={t} className="flex items-start gap-2.5" style={{ padding: "9px 11px", borderRadius: 10, background: "var(--surface-2)" }}>
                   <Icon name="dice" size={16} style={{ color: "var(--brand)", marginTop: 2, flex: "none" }} />

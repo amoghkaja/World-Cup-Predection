@@ -232,6 +232,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 jokerUsedElsewhere={jokerUsedElsewhere}
                 live={live}
                 unlockLabel={unlockLabel}
+                jokerUpside={maxPts}
               />
             </div>
           )}
