@@ -138,7 +138,7 @@ export default function ScoringPage() {
         <div
           className="grid items-center"
           style={{
-            gridTemplateColumns: "1fr auto auto auto",
+            gridTemplateColumns: "1fr auto auto",
             gap: 10,
             padding: "10px 18px",
             background: "var(--surface-2)",
@@ -154,9 +154,6 @@ export default function ScoringPage() {
           <span className="t-label" style={{ color: "var(--text-3)", textAlign: "right", width: 58 }}>
             Exact
           </span>
-          <span className="t-label" style={{ color: "var(--text-3)", textAlign: "right", width: 56 }}>
-            Max
-          </span>
         </div>
         {STAGE_ORDER.map((stage, i) => {
           const base = OUTCOME_POINTS[stage];
@@ -168,7 +165,7 @@ export default function ScoringPage() {
               key={stage}
               className="grid items-center"
               style={{
-                gridTemplateColumns: "1fr auto auto auto",
+                gridTemplateColumns: "1fr auto auto",
                 gap: 10,
                 padding: "12px 18px",
                 borderBottom: i < STAGE_ORDER.length - 1 ? "1px solid var(--line)" : "none",
@@ -233,18 +230,6 @@ export default function ScoringPage() {
                 }}
               >
                 +{exact}
-              </span>
-              <span
-                className="tnum"
-                style={{
-                  textAlign: "right",
-                  width: 56,
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 800,
-                  fontSize: 17,
-                }}
-              >
-                {max}
               </span>
             </div>
           );
