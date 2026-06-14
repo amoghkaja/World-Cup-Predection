@@ -43,9 +43,9 @@ function GambleChip({ label, pts, star }: { label: string; pts: number; star?: b
       className="inline-flex items-center tnum"
       style={{
         gap: 4,
-        fontSize: 10.5,
+        fontSize: 11.5,
         fontWeight: 700,
-        padding: "2px 7px",
+        padding: "3px 8px",
         borderRadius: 999,
         background: good ? "var(--good-soft)" : "var(--bad-soft)",
         color: good ? "var(--good)" : "var(--bad)",

@@ -22,12 +22,12 @@ returns date
 language sql stable
 as $$ select (ts at time zone 'America/New_York')::date $$;
 
--- Authoritative activation cutoff. Keep in sync with FEATURE_CUTOFF_ISO (TS).
--- Set to the first kickoff AFTER every team has played its opening group game.
+-- Authoritative activation cutoff. MUST match FEATURE_CUTOFF_ISO in src/lib/scoring.ts.
+-- Mon 15 Jun 00:00 CEST.
 create or replace function public.feature_cutoff()
 returns timestamptz
 language sql immutable
-as $$ select timestamptz '2026-06-18 16:00:00+00' $$;
+as $$ select timestamptz '2026-06-14 22:00:00+00' $$;
 
 -- ---------- side_bets (both-teams-to-score) ----------
 create table if not exists public.side_bets (
@@ -141,6 +141,10 @@ begin
   end if;
   v_day := public.tournament_day(v_ko);
 
+  -- Moving the day's joker to a new match: allowed only while the EXISTING
+  -- (joker_picks.*) match hasn't kicked off — you can't yank the joker off a
+  -- match already underway to dodge its result. The NEW match is already
+  -- verified open by the now() >= v_ko check above.
   insert into public.joker_picks (user_id, match_id, joker_day, submitted_at, points_awarded, scored)
   values (v_uid, p_match_id, v_day, now(), 0, false)
   on conflict (user_id, joker_day) do update

@@ -127,7 +127,7 @@ export async function recomputeStreaksAndPerfectDays(admin: Admin): Promise<void
   for (const m of matchRows ?? []) {
     const d = canonicalDay(m.kickoff_at);
     (byDay.get(d) ?? byDay.set(d, []).get(d)!).push(m.id);
-    if (m.status === "final" && m.home_score != null) {
+    if (m.status === "final" && m.home_score != null && m.away_score != null) {
       finalByDay.set(d, (finalByDay.get(d) ?? 0) + 1);
     }
   }
