@@ -4,10 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, getLeaderboard, getTeams, podiumWindows } from "@/lib/queries";
 import type {
   GroupPrediction,
+  JokerPick,
   MatchWithTeams,
   PodiumPrediction,
   Prediction,
   Profile,
+  SideBet,
   Team,
   TournamentPrediction,
 } from "@/lib/types";
@@ -33,6 +35,16 @@ const PODIUM_LABELS: { position: number; label: string }[] = [
   { position: 3, label: "Third place" },
 ];
 
+// Canonical tournament day "YYYY-MM-DD" → "Jun 14" for the bonus breakdown.
+function prettyDay(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export default async function UserPicksPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await getCurrentUser();
@@ -40,18 +52,36 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
 
   const supabase = await createClient();
   // RLS hides other users' tournament/group/podium picks until their lock
-  // passes, so the extra queries simply come back empty before then.
-  const [{ data: prof }, lb, { data: rows }, { data: podium }, { data: tourn }, { data: groups }, teams, windows] =
-    await Promise.all([
-      supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
-      getLeaderboard(),
-      supabase.from("predictions").select(SELECT).eq("user_id", id),
-      supabase.from("podium_predictions").select("*").eq("user_id", id).order("position"),
-      supabase.from("tournament_predictions").select("*").eq("user_id", id),
-      supabase.from("group_predictions").select("*").eq("user_id", id).order("group_label"),
-      getTeams(),
-      podiumWindows(),
-    ]);
+  // passes, and side bets / jokers until each match kicks off, so the extra
+  // queries simply come back empty before then. Streaks & perfect days are
+  // public (they hold only derived points the board already exposes).
+  const [
+    { data: prof },
+    lb,
+    { data: rows },
+    { data: podium },
+    { data: tourn },
+    { data: groups },
+    { data: sideBetRows },
+    { data: jokerRows },
+    { data: perfectRows },
+    { data: streakRows },
+    teams,
+    windows,
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
+    getLeaderboard(),
+    supabase.from("predictions").select(SELECT).eq("user_id", id),
+    supabase.from("podium_predictions").select("*").eq("user_id", id).order("position"),
+    supabase.from("tournament_predictions").select("*").eq("user_id", id),
+    supabase.from("group_predictions").select("*").eq("user_id", id).order("group_label"),
+    supabase.from("side_bets").select("*").eq("user_id", id),
+    supabase.from("joker_picks").select("*").eq("user_id", id),
+    supabase.from("perfect_days").select("*").eq("user_id", id).order("day"),
+    supabase.from("streak_bonuses").select("points_awarded").eq("user_id", id),
+    getTeams(),
+    podiumWindows(),
+  ]);
   if (!prof) notFound();
   const profile = prof as Profile;
 
@@ -76,6 +106,48 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const items = ((rows ?? []) as unknown as Row[])
     .filter((p) => p.match)
     .sort((a, b) => b.match!.kickoff_at.localeCompare(a.match!.kickoff_at));
+
+  // Side bets & jokers, keyed by match for the per-row result chips.
+  const sideBets = (sideBetRows ?? []) as SideBet[];
+  const jokers = (jokerRows ?? []) as JokerPick[];
+  const perfectDays = (perfectRows ?? []) as { day: string; correct_picks: number; points_awarded: number }[];
+  const sidesByMatch = new Map<number, SideBet[]>();
+  for (const b of sideBets) {
+    (sidesByMatch.get(b.match_id) ?? sidesByMatch.set(b.match_id, []).get(b.match_id)!).push(b);
+  }
+  const jokerByMatch = new Map<number, JokerPick>();
+  for (const j of jokers) jokerByMatch.set(j.match_id, j);
+
+  // Points breakdown — every source that feeds the leaderboard total, so the
+  // number on the card is never a mystery. Only non-zero rows are shown.
+  const sum = <T,>(arr: T[], f: (x: T) => number) => arr.reduce((s, x) => s + f(x), 0);
+  const mainPts = sum(items, (p) => p.points_awarded);
+  const groupPts = sum(((groups ?? []) as GroupPrediction[]), (g) => g.points_awarded);
+  const tournPts = sum(((tourn ?? []) as TournamentPrediction[]), (t) => t.points_awarded);
+  const podiumPts = sum(podiumPicks, (p) => p.points_awarded);
+  const sidePts = sum(sideBets.filter((b) => b.scored), (b) => b.points_awarded);
+  const jokerPts = sum(jokers.filter((j) => j.scored), (j) => j.points_awarded);
+  const perfectPts = sum(perfectDays, (d) => d.points_awarded);
+  const streakPts = sum(((streakRows ?? []) as { points_awarded: number }[]), (s) => s.points_awarded);
+
+  const breakdown: { label: string; pts: number; hint?: string }[] = [
+    { label: "Match picks", pts: mainPts },
+    { label: "Group stage", pts: groupPts },
+    { label: "Golden Boot", pts: tournPts },
+    { label: "Podium", pts: podiumPts },
+    { label: "Side bets", pts: sidePts, hint: "both-teams-to-score" },
+    { label: "Joker", pts: jokerPts, hint: "doubled a pick" },
+    { label: "Streak bonus", pts: streakPts, hint: "3+ correct in a row" },
+    {
+      label: "Perfect days",
+      pts: perfectPts,
+      hint: perfectDays.length
+        ? perfectDays
+            .map((d) => `${prettyDay(d.day)}: all ${d.correct_picks} correct`)
+            .join(" · ")
+        : undefined,
+    },
+  ].filter((r) => r.pts !== 0);
 
   const firstName = (profile.display_name ?? "this player").split(" ")[0];
 
@@ -102,6 +174,47 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
           </div>
         </div>
       </div>
+
+      {breakdown.length > 0 && (
+        <>
+          <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
+            How the {points} points add up
+          </div>
+          <div className="card mb-4" style={{ overflow: "hidden" }}>
+            {breakdown.map((r, i) => (
+              <div
+                key={r.label}
+                className="flex items-center gap-3"
+                style={{
+                  padding: "10px 16px",
+                  borderBottom: i === breakdown.length - 1 ? "none" : "1px solid var(--line)",
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div style={{ fontWeight: 650, fontSize: 14 }}>{r.label}</div>
+                  {r.hint && (
+                    <div className="t-xs" style={{ color: "var(--text-3)" }}>
+                      {r.hint}
+                    </div>
+                  )}
+                </div>
+                <span
+                  className="tnum"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 800,
+                    fontSize: 16,
+                    color: r.pts < 0 ? "var(--bad)" : "var(--text)",
+                  }}
+                >
+                  {r.pts > 0 ? "+" : ""}
+                  {r.pts}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
         Tournament calls
@@ -199,6 +312,8 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
               pred={p}
               last={i === items.length - 1}
               ownerName={firstName}
+              sideBets={sidesByMatch.get(p.match_id)}
+              joker={jokerByMatch.get(p.match_id) ?? null}
             />
           ))}
         </div>
