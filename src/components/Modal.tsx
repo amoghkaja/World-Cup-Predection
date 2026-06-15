@@ -11,11 +11,15 @@ export function Modal({
   onClose,
   label,
   maxWidth = 380,
+  dismissible = true,
   children,
 }: {
   onClose: () => void;
   label: string;
   maxWidth?: number;
+  // When false, backdrop click and Escape do NOT close — the content must
+  // provide its own explicit dismissal (e.g. a "must read" acknowledgement).
+  dismissible?: boolean;
   children: React.ReactNode;
 }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -30,7 +34,7 @@ export function Modal({
     const prevFocus = document.activeElement as HTMLElement | null;
     boxRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
+      if (dismissible && e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
@@ -40,11 +44,11 @@ export function Modal({
       document.body.style.overflow = prevOverflow;
       prevFocus?.focus?.();
     };
-  }, []);
+  }, [dismissible]);
 
   return (
     <div
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
       style={{
         position: "fixed",
         inset: 0,
