@@ -231,17 +231,6 @@ export const getMyStreak = cache(async (): Promise<number> => {
   return (data as { streak_len: number } | null)?.streak_len ?? 0;
 });
 
-/** Canonical days on which the current user landed a perfect matchday (for the badge). */
-export const getMyPerfectDays = cache(async (): Promise<Set<string>> => {
-  const user = await getCurrentUser();
-  const set = new Set<string>();
-  if (!user) return set;
-  const supabase = await createClient();
-  const { data } = await supabase.from("perfect_days").select("day").eq("user_id", user.id);
-  (data ?? []).forEach((r) => set.add((r as { day: string }).day));
-  return set;
-});
-
 export async function getMyGroupPredictions(): Promise<Map<string, GroupPrediction>> {
   const user = await getCurrentUser();
   const map = new Map<string, GroupPrediction>();

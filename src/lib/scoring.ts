@@ -109,7 +109,7 @@ export function scorePodium(position: number, correct: boolean, revised: boolean
 }
 
 /* ============================================================
-   Side bets · Joker · Streak · Perfect matchday (v3 add-ons)
+   Side bets · Joker · Streak (v3 add-ons)
    Opt-in gambles + engagement bonuses layered on top of the
    main pick. Main picks are unchanged (a wrong pick = 0).
    ============================================================ */
@@ -141,32 +141,25 @@ export function scoreJoker(mainPoints: number): number {
   return mainPoints > 0 ? mainPoints : JOKER_WRONG_PENALTY;
 }
 
-// --- Streak: consecutive correct main results (any wrong OR skipped eligible
-// match resets it). Bonus awarded on the match that extends the run to length n.
-export const STREAK_BONUS = [0, 0, 1, 2, 3, 5]; // index = run length − 1, clamp to last
+// --- Streak: consecutive correct main results, in kickoff order (any wrong OR
+// skipped eligible match resets the run to 0). Every time the run reaches a
+// multiple of STREAK_TARGET — i.e. 5, 10, 15 in a row — that match earns the
+// bonus. This is purely order-based: it never depends on which calendar day a
+// match falls under, so it's fair across timezones (replaced the perfect-day
+// bonus, which did depend on day grouping).
+export const STREAK_TARGET = 5;
+export const STREAK_REWARD = 10;
 
 export function streakBonusFor(streakLen: number): number {
-  if (streakLen <= 0) return 0;
-  return STREAK_BONUS[Math.min(streakLen, STREAK_BONUS.length) - 1];
+  return streakLen > 0 && streakLen % STREAK_TARGET === 0 ? STREAK_REWARD : 0;
 }
 
-// --- Perfect matchday: all of a day's picks correct, and you must have picked
-// every eligible match that day (min 2).
-export const PERFECT_DAY_MIN_PICKS = 2;
-export const PERFECT_DAY_BASE = 5;
-export const PERFECT_DAY_PER_MATCH = 2;
-
-export function perfectDayBonus(correctPicks: number): number {
-  if (correctPicks < PERFECT_DAY_MIN_PICKS) return 0;
-  return PERFECT_DAY_BASE + PERFECT_DAY_PER_MATCH * correctPicks;
-}
-
-// --- Canonical league day. A single fixed zone so "one joker per day" and
-// "perfect matchday" mean the same calendar day for every player, regardless of
+// --- Canonical league day for the "one joker per day" allowance: a single
+// fixed zone so every player's joker resets on the same boundary regardless of
 // their own timezone. MUST match the SQL tournament_day() function (migration
-// 0011). Europe/Berlin (CEST) is chosen so the day boundary lands on the same
-// midnight as FEATURE_CUTOFF_ISO below — otherwise the cutoff slices a match day
-// in two and a partial day can be scored as "perfect".
+// 0011). Europe/Berlin (CEST) aligns the boundary with FEATURE_CUTOFF_ISO's
+// midnight. (Scoring no longer depends on the day — the streak bonus replaced
+// the perfect-matchday bonus precisely to avoid day-grouping unfairness.)
 export const TOURNAMENT_DAY_TZ = "Europe/Berlin";
 
 const TOURNAMENT_DAY_FMT = new Intl.DateTimeFormat("en-CA", {
@@ -183,7 +176,7 @@ export function tournamentDay(iso: string): string {
 
 // --- Activation cutoff. The controls show on every open match immediately but
 // stay LOCKED until this moment; after it, they're usable. It's also the point
-// from which streak / perfect-day / settlement count. Authoritative gate is the
+// from which streak / settlement count. Authoritative gate is the
 // SQL feature_cutoff(); this mirrors it for UI + pre-checks.
 export const FEATURE_CUTOFF_ISO =
   process.env.NEXT_PUBLIC_FEATURE_CUTOFF ?? "2026-06-14T22:00:00Z"; // Mon 15 Jun 00:00 CEST

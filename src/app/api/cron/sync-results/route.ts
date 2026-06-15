@@ -4,7 +4,7 @@ import { revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { TAG_LEADERBOARD, TAG_MATCHES, TAG_PLAYERS } from "@/lib/queries";
 import { scorePrediction } from "@/lib/scoring";
-import { settleMatchSideEffects, recomputeStreaksAndPerfectDays } from "@/lib/settle";
+import { settleMatchSideEffects, recomputeStreaks } from "@/lib/settle";
 import type { Match, MatchStage, Prediction, Team } from "@/lib/types";
 
 // Single call to football-data.org returns all 104 World Cup matches. We update
@@ -232,7 +232,7 @@ export async function GET(req: NextRequest) {
         );
       }
       // Side bets + joker for this match (after the main rescore above). The
-      // global streak/perfect-day rebuild runs once at the end of the sync.
+      // global streak rebuild runs once at the end of the sync.
       await settleMatchSideEffects(admin, updated as Match);
     }
   }
@@ -326,8 +326,8 @@ export async function GET(req: NextRequest) {
     revalidateTag(TAG_MATCHES, "max");
   }
   if (report.applied.length > 0) {
-    // Rebuild streak + perfect-day bonuses once for the whole batch, then refresh.
-    await recomputeStreaksAndPerfectDays(admin);
+    // Rebuild streak bonuses once for the whole batch, then refresh.
+    await recomputeStreaks(admin);
     revalidateTag(TAG_LEADERBOARD, "max");
   }
   if (playersImported > 0) {

@@ -8,10 +8,8 @@ import {
   BTTS_REWARD,
   BTTS_PENALTY,
   JOKER_WRONG_PENALTY,
-  STREAK_BONUS,
-  PERFECT_DAY_BASE,
-  PERFECT_DAY_PER_MATCH,
-  PERFECT_DAY_MIN_PICKS,
+  STREAK_TARGET,
+  STREAK_REWARD,
 } from "@/lib/scoring";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -393,7 +391,7 @@ export default function ScoringPage() {
         </div>
         <p className="t-sm" style={{ color: "var(--text-2)", marginBottom: 14 }}>
           Optional extras that go live once every team has played its first game. Side bets are a
-          gamble (a wrong call loses points); streaks &amp; perfect days are bonuses on your main picks.
+          gamble (a wrong call loses points); the streak is a bonus on your main picks.
         </p>
 
         <div className="flex flex-col gap-2.5">
@@ -413,21 +411,11 @@ export default function ScoringPage() {
 
           {/* Streak */}
           <Row
-            title="Streak bonus"
-            desc="Consecutive correct picks. A wrong or skipped game resets it."
+            title={`Streak: ${STREAK_TARGET} in a row`}
+            desc="Correct results back-to-back (kickoff order). A wrong or skipped game resets it."
           >
             <span className="tnum" style={{ color: "var(--gold-strong)", fontWeight: 800 }}>
-              up to +{STREAK_BONUS[STREAK_BONUS.length - 1]}/match
-            </span>
-          </Row>
-
-          {/* Perfect day */}
-          <Row
-            title="Perfect matchday"
-            desc={`Pick every match that day (min ${PERFECT_DAY_MIN_PICKS}) and get them all right.`}
-          >
-            <span className="tnum" style={{ color: "var(--gold-strong)", fontWeight: 800 }}>
-              +{PERFECT_DAY_BASE}&nbsp;+&nbsp;{PERFECT_DAY_PER_MATCH}/match
+              +{STREAK_REWARD} every {STREAK_TARGET}
             </span>
           </Row>
         </div>

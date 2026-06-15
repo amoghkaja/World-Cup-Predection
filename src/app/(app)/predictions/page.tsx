@@ -1,13 +1,6 @@
 import Link from "next/link";
-import {
-  getMatches,
-  getMyPredictions,
-  getMySideBets,
-  getMyJokers,
-  getMyPerfectDays,
-} from "@/lib/queries";
+import { getMatches, getMyPredictions, getMySideBets, getMyJokers } from "@/lib/queries";
 import { zonedDayKey, zonedDayLabel } from "@/lib/format";
-import { tournamentDay } from "@/lib/scoring";
 import { getViewerTimeZone } from "@/lib/tz";
 import type { MatchWithTeams, Prediction, SideBet } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -34,13 +27,12 @@ export default async function PredictionsPage({
   const { tab: tabParam } = await searchParams;
   const tab: Tab = tabParam === "settled" || tabParam === "pending" ? tabParam : "all";
 
-  const [matches, preds, tz, sideBets, jokers, perfectDays] = await Promise.all([
+  const [matches, preds, tz, sideBets, jokers] = await Promise.all([
     getMatches(),
     getMyPredictions(),
     getViewerTimeZone(),
     getMySideBets(),
     getMyJokers(),
-    getMyPerfectDays(),
   ]);
 
   // Index side bets by match id for the per-row result chips.
@@ -155,39 +147,25 @@ export default async function PredictionsPage({
         </div>
       )}
 
-      {days.map(([k, items]) => {
-        const perfect = perfectDays.has(tournamentDay(items[0].match.kickoff_at));
-        return (
-          <div key={k} className="mb-[18px]">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="t-label" style={{ color: "var(--text-3)" }}>
-                {zonedDayLabel(items[0].match.kickoff_at, tz)}
-              </span>
-              {perfect && (
-                <span
-                  className="pill"
-                  style={{ background: "var(--gold-soft)", color: "var(--on-gold)", fontSize: 10.5 }}
-                >
-                  <Icon name="trophy" size={11} sw={2.4} />
-                  Perfect day
-                </span>
-              )}
-            </div>
-            <div className="card" style={{ overflow: "hidden" }}>
-              {items.map((item, i) => (
-                <CompactPredictionRow
-                  key={item.match.id}
-                  match={item.match}
-                  pred={item.pred}
-                  last={i === items.length - 1}
-                  sideBets={sidesByMatch.get(item.match.id)}
-                  joker={jokers.byMatch.get(item.match.id) ?? null}
-                />
-              ))}
-            </div>
+      {days.map(([k, items]) => (
+        <div key={k} className="mb-[18px]">
+          <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
+            {zonedDayLabel(items[0].match.kickoff_at, tz)}
           </div>
-        );
-      })}
+          <div className="card" style={{ overflow: "hidden" }}>
+            {items.map((item, i) => (
+              <CompactPredictionRow
+                key={item.match.id}
+                match={item.match}
+                pred={item.pred}
+                last={i === items.length - 1}
+                sideBets={sidesByMatch.get(item.match.id)}
+                joker={jokers.byMatch.get(item.match.id) ?? null}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

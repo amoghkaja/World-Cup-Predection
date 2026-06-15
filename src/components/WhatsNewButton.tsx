@@ -3,7 +3,7 @@
 import { Icon } from "./Icon";
 
 // Re-opens the "what's new" splash (handled by <FeatureSplash />) so players can
-// re-read the side bets / joker / streak / perfect-day rules at any time.
+// re-read the points system / side bets / joker / streak rules at any time.
 export function WhatsNewButton() {
   return (
     <button
