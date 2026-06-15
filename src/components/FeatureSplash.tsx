@@ -9,17 +9,17 @@ import {
   BTTS_REWARD,
   BTTS_PENALTY,
   JOKER_WRONG_PENALTY,
-  PERFECT_DAY_BASE,
-  PERFECT_DAY_PER_MATCH,
+  STREAK_TARGET,
+  STREAK_REWARD,
 } from "@/lib/scoring";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 
-// Bumped from wc_features_v1 so EVERY player sees this again — the points system
-// changed and the splash is now a mandatory read (can't be dismissed without
-// stepping through and acknowledging). Replayable via the "What's new" event.
-const KEY = "wc_points_change_v2";
+// Bumped so EVERY player sees this again — the points system changed (the
+// perfect-day bonus became a "5 in a row" streak) and the splash is a mandatory
+// read (can't be dismissed without stepping through). "What's new" replays it.
+const KEY = "wc_points_change_v3";
 
 const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
   weekday: "long",
@@ -33,7 +33,6 @@ const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
 // scoring module so this can never drift from how points are actually awarded).
 const TABLE_STAGES: MatchStage[] = ["group", "r16", "qf", "sf", "final"];
 
-const STREAK_TEXT = "3 in a row +1, 4 → +2, 5 → +3, 6+ → +5";
 
 function PointsTable() {
   return (
@@ -111,8 +110,8 @@ const STEPS: Step[] = [
   },
   {
     icon: "flame",
-    title: "Streaks & Perfect Days",
-    body: `Pick correct results back-to-back for a streak bonus (${STREAK_TEXT}); one miss or a skipped game resets it. And if you pick EVERY match on a day and get them all right, that's a Perfect Day: +${PERFECT_DAY_BASE} plus ${PERFECT_DAY_PER_MATCH} per match.`,
+    title: `Build a streak: ${STREAK_TARGET} in a row`,
+    body: `Get the result right on ${STREAK_TARGET} matches in a row — in kickoff order — for a +${STREAK_REWARD} bonus, and again at every ${STREAK_TARGET} after that. One wrong result, or skipping an eligible match, resets your run to zero. (This replaces the old "perfect day" bonus, so it no longer matters what timezone you're in.)`,
   },
 ];
 

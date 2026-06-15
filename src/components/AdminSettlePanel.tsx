@@ -73,12 +73,11 @@ export function AdminSettlePanel({
         </button>
       </div>
 
-      {/* Side bets / joker / streak / perfect-day backfill */}
+      {/* Side bets / joker / streak backfill */}
       <div className="card p-3.5 flex items-center justify-between gap-3 flex-wrap">
         <div className="t-sm" style={{ color: "var(--text-2)", maxWidth: 360 }}>
-          Side bets, joker, streaks &amp; perfect days settle automatically. Run this once after
-          launch (or after changing the scoring constants) to (re)compute them across already-played
-          matches.
+          Side bets, joker &amp; streaks settle automatically. Run this once after launch (or after
+          changing the scoring constants) to (re)compute them across already-played matches.
         </div>
         <button
           className="btn btn-ghost"

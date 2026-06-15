@@ -18,7 +18,7 @@ import {
   GOLDEN_BOOT_POINTS,
   type SideBetPick,
 } from "@/lib/scoring";
-import { settleMatchSideEffects, recomputeStreaksAndPerfectDays } from "@/lib/settle";
+import { settleMatchSideEffects, recomputeStreaks } from "@/lib/settle";
 import type { Match, PodiumPosition, PredOutcome, Prediction } from "@/lib/types";
 
 type Result<T = void> = { ok: true; data?: T } | { ok: false; error: string };
@@ -444,9 +444,9 @@ export async function saveMatchResult(input: {
       await settlePodiumWith(admin);
     }
 
-    // Side bets + joker for this match, then the global streak/perfect-day rebuild.
+    // Side bets + joker for this match, then the global streak rebuild.
     await settleMatchSideEffects(admin, updated as Match);
-    await recomputeStreaksAndPerfectDays(admin);
+    await recomputeStreaks(admin);
 
     updateTag(TAG_MATCHES);
     updateTag(TAG_LEADERBOARD);
@@ -603,7 +603,7 @@ export async function settleGoldenBoot(name: string): Promise<Result> {
   }
 }
 
-// Admin: (re)compute side bets / joker / streak / perfect-day across every
+// Admin: (re)compute side bets / joker / streak across every
 // already-final eligible match. Idempotent — for backfilling after deploy or
 // re-running after tuning the scoring constants.
 export async function recomputeFeatureScoring(): Promise<Result> {
@@ -618,7 +618,7 @@ export async function recomputeFeatureScoring(): Promise<Result> {
     for (const m of (finals ?? []) as Match[]) {
       await settleMatchSideEffects(admin, m);
     }
-    await recomputeStreaksAndPerfectDays(admin);
+    await recomputeStreaks(admin);
     updateTag(TAG_LEADERBOARD);
     return { ok: true };
   } catch (e) {

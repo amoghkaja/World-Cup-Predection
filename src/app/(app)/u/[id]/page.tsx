@@ -35,16 +35,6 @@ const PODIUM_LABELS: { position: number; label: string }[] = [
   { position: 3, label: "Third place" },
 ];
 
-// Canonical tournament day "YYYY-MM-DD" → "Jun 14" for the bonus breakdown.
-function prettyDay(day: string): string {
-  const [y, m, d] = day.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
 export default async function UserPicksPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await getCurrentUser();
@@ -53,8 +43,8 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const supabase = await createClient();
   // RLS hides other users' tournament/group/podium picks until their lock
   // passes, and side bets / jokers until each match kicks off, so the extra
-  // queries simply come back empty before then. Streaks & perfect days are
-  // public (they hold only derived points the board already exposes).
+  // queries simply come back empty before then. Streak bonuses are public
+  // (they hold only derived points the board already exposes).
   const [
     { data: prof },
     lb,
@@ -64,7 +54,6 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
     { data: groups },
     { data: sideBetRows },
     { data: jokerRows },
-    { data: perfectRows },
     { data: streakRows },
     teams,
     windows,
@@ -77,7 +66,6 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
     supabase.from("group_predictions").select("*").eq("user_id", id).order("group_label"),
     supabase.from("side_bets").select("*").eq("user_id", id),
     supabase.from("joker_picks").select("*").eq("user_id", id),
-    supabase.from("perfect_days").select("*").eq("user_id", id).order("day"),
     supabase.from("streak_bonuses").select("points_awarded").eq("user_id", id),
     getTeams(),
     podiumWindows(),
@@ -110,7 +98,6 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   // Side bets & jokers, keyed by match for the per-row result chips.
   const sideBets = (sideBetRows ?? []) as SideBet[];
   const jokers = (jokerRows ?? []) as JokerPick[];
-  const perfectDays = (perfectRows ?? []) as { day: string; correct_picks: number; points_awarded: number }[];
   const sidesByMatch = new Map<number, SideBet[]>();
   for (const b of sideBets) {
     (sidesByMatch.get(b.match_id) ?? sidesByMatch.set(b.match_id, []).get(b.match_id)!).push(b);
@@ -127,7 +114,6 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const podiumPts = sum(podiumPicks, (p) => p.points_awarded);
   const sidePts = sum(sideBets.filter((b) => b.scored), (b) => b.points_awarded);
   const jokerPts = sum(jokers.filter((j) => j.scored), (j) => j.points_awarded);
-  const perfectPts = sum(perfectDays, (d) => d.points_awarded);
   const streakPts = sum(((streakRows ?? []) as { points_awarded: number }[]), (s) => s.points_awarded);
 
   const breakdown: { label: string; pts: number; hint?: string }[] = [
@@ -137,16 +123,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
     { label: "Podium", pts: podiumPts },
     { label: "Side bets", pts: sidePts, hint: "both-teams-to-score" },
     { label: "Joker", pts: jokerPts, hint: "doubled a pick" },
-    { label: "Streak bonus", pts: streakPts, hint: "3+ correct in a row" },
-    {
-      label: "Perfect days",
-      pts: perfectPts,
-      hint: perfectDays.length
-        ? perfectDays
-            .map((d) => `${prettyDay(d.day)}: all ${d.correct_picks} correct`)
-            .join(" · ")
-        : undefined,
-    },
+    { label: "Streak bonus", pts: streakPts, hint: "5 correct in a row" },
   ].filter((r) => r.pts !== 0);
 
   const firstName = (profile.display_name ?? "this player").split(" ")[0];
