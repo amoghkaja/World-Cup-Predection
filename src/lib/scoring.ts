@@ -161,6 +161,26 @@ export function perfectDayBonus(correctPicks: number): number {
   return PERFECT_DAY_BASE + PERFECT_DAY_PER_MATCH * correctPicks;
 }
 
+// --- Canonical league day. A single fixed zone so "one joker per day" and
+// "perfect matchday" mean the same calendar day for every player, regardless of
+// their own timezone. MUST match the SQL tournament_day() function (migration
+// 0011). Europe/Berlin (CEST) is chosen so the day boundary lands on the same
+// midnight as FEATURE_CUTOFF_ISO below — otherwise the cutoff slices a match day
+// in two and a partial day can be scored as "perfect".
+export const TOURNAMENT_DAY_TZ = "Europe/Berlin";
+
+const TOURNAMENT_DAY_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TOURNAMENT_DAY_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** Canonical "YYYY-MM-DD" league day for a kickoff (matches SQL tournament_day). */
+export function tournamentDay(iso: string): string {
+  return TOURNAMENT_DAY_FMT.format(new Date(iso));
+}
+
 // --- Activation cutoff. The controls show on every open match immediately but
 // stay LOCKED until this moment; after it, they're usable. It's also the point
 // from which streak / perfect-day / settlement count. Authoritative gate is the
