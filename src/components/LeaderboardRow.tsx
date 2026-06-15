@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
-import { accuracyPct } from "@/lib/scoring";
+import { accuracyPct, STREAK_TARGET } from "@/lib/scoring";
 import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icon";
 
 // Medal disc for the top three, plain rank number for everyone else.
 const MEDALS: Record<number, { bg: string; fg: string }> = {
@@ -16,14 +17,19 @@ export function LeaderboardRow({
   rank,
   me,
   last,
+  streak = 0,
 }: {
   row: LeaderboardRowData;
   rank: number;
   me?: boolean;
   last?: boolean;
+  // Current correct-result run; shown as a flame once it's a real streak (≥2).
+  streak?: number;
 }) {
   const acc = accuracyPct(row);
   const medal = MEDALS[rank];
+  // Hot once it's at/over the paying target (every STREAK_TARGET in a row).
+  const streakHot = streak >= STREAK_TARGET;
 
   return (
     <Link
@@ -74,8 +80,33 @@ export function LeaderboardRow({
         <div className="truncate" style={{ fontWeight: me ? 750 : 650, fontSize: 14.5 }}>
           {me ? "You" : row.display_name ?? "Anonymous"}
         </div>
-        <div className="t-xs tnum" style={{ color: "var(--text-3)" }}>
-          {acc}% accuracy · {row.total_match_preds} picks
+        <div className="flex items-center gap-1.5">
+          {streak >= 2 && (
+            <span
+              className="inline-flex items-center tnum"
+              style={{
+                gap: 2,
+                fontSize: 11,
+                fontWeight: 800,
+                padding: "1px 6px 1px 4px",
+                borderRadius: 999,
+                background: streakHot ? "var(--gold-soft)" : "var(--surface-2)",
+                color: streakHot ? "var(--gold-strong)" : "var(--text-2)",
+              }}
+              title={`${streak} correct in a row`}
+            >
+              <Icon
+                name="flame"
+                size={11}
+                sw={2.2}
+                style={{ color: streakHot ? "var(--gold-strong)" : "var(--flame, #e8763a)" }}
+              />
+              {streak}
+            </span>
+          )}
+          <span className="t-xs tnum" style={{ color: "var(--text-3)" }}>
+            {acc}% accuracy · {row.total_match_preds} picks
+          </span>
         </div>
       </div>
       <div className="tnum" style={{ textAlign: "right" }}>

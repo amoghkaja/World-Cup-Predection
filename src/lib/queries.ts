@@ -14,7 +14,7 @@ import type {
   Team,
   TournamentPrediction,
 } from "@/lib/types";
-import { featuresActiveFor } from "@/lib/scoring";
+import { featuresActiveFor, FEATURE_CUTOFF_ISO } from "@/lib/scoring";
 
 export type PodiumWindows = {
   firstKickoff: string | null;
@@ -128,6 +128,40 @@ export const getLeaderboard = unstable_cache(
     });
   },
   ["leaderboard"],
+  { tags: [TAG_LEADERBOARD], revalidate: 60 }
+);
+
+/**
+ * Every user's CURRENT streak run-length, for the leaderboard flame badge: the
+ * streak_len recorded on the latest settled eligible match (absent = the run
+ * broke there, so 0). Board-wide and public (streak_bonuses is readable by all),
+ * so it's cached and refreshed whenever scoring runs.
+ */
+export const getCurrentStreaks = unstable_cache(
+  async (): Promise<Record<string, number>> => {
+    const supabase = createStaticClient();
+    const { data: latest } = await supabase
+      .from("matches")
+      .select("id, home_score")
+      .gte("kickoff_at", FEATURE_CUTOFF_ISO)
+      .eq("status", "final")
+      .not("home_score", "is", null)
+      .order("kickoff_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!latest) return {};
+    const { data } = await supabase
+      .from("streak_bonuses")
+      .select("user_id, streak_len")
+      .eq("match_id", (latest as { id: number }).id);
+    const out: Record<string, number> = {};
+    for (const r of (data ?? []) as { user_id: string; streak_len: number }[]) {
+      out[r.user_id] = r.streak_len;
+    }
+    return out;
+  },
+  ["current-streaks"],
   { tags: [TAG_LEADERBOARD], revalidate: 60 }
 );
 

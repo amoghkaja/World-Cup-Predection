@@ -101,7 +101,7 @@ const STEPS: Step[] = [
   {
     icon: "dice",
     title: "New: side bets",
-    body: `On every match you can add one optional gamble — Both Teams To Score. Call it right: +${BTTS_REWARD}. Get it wrong: ${BTTS_PENALTY}. Only bet when you're sure.`,
+    body: `On any match you can add one optional gamble — Both Teams To Score, Yes or No. Call it right: +${BTTS_REWARD}. Get it wrong: ${BTTS_PENALTY}. It's separate from your match pick, so only bet when you're sure.`,
   },
   {
     icon: "star",

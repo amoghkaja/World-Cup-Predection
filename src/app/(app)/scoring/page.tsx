@@ -10,6 +10,8 @@ import {
   JOKER_WRONG_PENALTY,
   STREAK_TARGET,
   STREAK_REWARD,
+  FEATURE_CUTOFF_ISO,
+  TOURNAMENT_DAY_TZ,
 } from "@/lib/scoring";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -20,6 +22,14 @@ import { WhatsNewButton } from "@/components/WhatsNewButton";
 
 // Static explainer. Every number is pulled straight from @/lib/scoring so the
 // page can never drift from how points are actually awarded. No multiplier.
+
+// When the optional features unlock — formatted in the league timezone so it's
+// the same date for everyone and can't drift from FEATURE_CUTOFF_ISO.
+const UNLOCK_DATE = new Date(FEATURE_CUTOFF_ISO).toLocaleDateString("en-GB", {
+  day: "numeric",
+  month: "long",
+  timeZone: TOURNAMENT_DAY_TZ,
+});
 
 const STAGE_ORDER: MatchStage[] = ["group", "r32", "r16", "qf", "sf", "third", "final"];
 const STAGE_CODE: Record<MatchStage, string> = {
@@ -129,7 +139,8 @@ export default function ScoringPage() {
       <div className="mb-3">
         <h2 className="t-h2">Match points by round</h2>
         <p className="t-sm" style={{ color: "var(--text-3)", marginTop: 3 }}>
-          Correct result earns the base. An exact scoreline adds a bonus on top.
+          Correct result earns the base. An exact scoreline adds a bonus on top. A wrong result
+          scores nothing — but it never costs you points.
         </p>
       </div>
       <div className="card mb-[22px]" style={{ overflow: "hidden" }}>
@@ -232,6 +243,41 @@ export default function ScoringPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* accuracy callout */}
+      <div
+        className="card flex gap-3 items-start mb-3"
+        style={{
+          padding: "15px 17px",
+          background: "var(--gold-soft)",
+          border: "1px solid var(--line)",
+        }}
+      >
+        <div
+          className="grid place-items-center"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 11,
+            flex: "none",
+            background: "var(--gold-strong)",
+            color: "var(--on-gold)",
+          }}
+        >
+          <Icon name="target" size={18} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 14.5, color: "var(--on-gold)" }}>
+            Accuracy counts both halves
+          </div>
+          <div className="t-sm" style={{ color: "var(--text-2)", marginTop: 2 }}>
+            Every settled pick is judged on two things — the result and the exact score — so your
+            accuracy on the leaderboard is your hits out of twice your picks. Get the result but miss
+            the score and that match is 50% accurate. (Accuracy is a stat only; your rank is by
+            points.)
+          </div>
+        </div>
       </div>
 
       {/* lock rule callout */}
@@ -390,20 +436,27 @@ export default function ScoringPage() {
           <h2 className="t-h2">Gambles &amp; bonuses</h2>
         </div>
         <p className="t-sm" style={{ color: "var(--text-2)", marginBottom: 14 }}>
-          Optional extras that go live once every team has played its first game. Side bets are a
-          gamble (a wrong call loses points); the streak is a bonus on your main picks.
+          Optional extras, live from {UNLOCK_DATE} — they apply to every match kicking off after
+          that. The side bet is a gamble (a wrong call loses points); the joker and streak are
+          bonuses layered on your main picks. None of them ever reduce your match-pick points.
         </p>
 
         <div className="flex flex-col gap-2.5">
           {/* BTTS */}
-          <Row title="Both teams to score?" desc="A coin-flip yes/no call on any match.">
+          <Row
+            title="Side bet · both teams to score?"
+            desc="Yes/No on any match — the only side bet. Right: you gain; wrong: you lose points."
+          >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{BTTS_REWARD}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
             <span style={{ color: "var(--bad)", fontWeight: 800 }}>{BTTS_PENALTY}</span>
           </Row>
 
           {/* Joker */}
-          <Row title="Joker / double-down" desc="One per day. Stake it on a match.">
+          <Row
+            title="Joker · double-down"
+            desc="One per day. Doubles your match points if the pick is right; a flat penalty if wrong."
+          >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>×2</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
             <span style={{ color: "var(--bad)", fontWeight: 800 }}>{JOKER_WRONG_PENALTY}</span>
@@ -411,8 +464,8 @@ export default function ScoringPage() {
 
           {/* Streak */}
           <Row
-            title={`Streak: ${STREAK_TARGET} in a row`}
-            desc="Correct results back-to-back (kickoff order). A wrong or skipped game resets it."
+            title={`Streak · ${STREAK_TARGET} in a row`}
+            desc={`Get the result right on ${STREAK_TARGET} matches in a row (kickoff order). One wrong or skipped game resets your run to zero.`}
           >
             <span className="tnum" style={{ color: "var(--gold-strong)", fontWeight: 800 }}>
               +{STREAK_REWARD} every {STREAK_TARGET}

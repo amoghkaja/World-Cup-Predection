@@ -1,11 +1,15 @@
-import { getCurrentUser, getLeaderboard } from "@/lib/queries";
+import { getCurrentUser, getLeaderboard, getCurrentStreaks } from "@/lib/queries";
 import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
 import { LeaderboardRow } from "@/components/LeaderboardRow";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeaderboardPage() {
-  const [rows, user] = await Promise.all([getLeaderboard(), getCurrentUser()]);
+  const [rows, user, streaks] = await Promise.all([
+    getLeaderboard(),
+    getCurrentUser(),
+    getCurrentStreaks(),
+  ]);
   const me = (r: LeaderboardRowData) => r.user_id === user?.id;
   const my = rows.find(me);
 
@@ -52,6 +56,7 @@ export default async function LeaderboardPage() {
               rank={r.rank}
               me={me(r)}
               last={i === rows.length - 1}
+              streak={streaks[r.user_id] ?? 0}
             />
           ))}
         </div>
