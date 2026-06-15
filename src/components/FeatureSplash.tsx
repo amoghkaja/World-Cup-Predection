@@ -1,13 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FEATURE_CUTOFF_ISO, featuresLive } from "@/lib/scoring";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  FEATURE_CUTOFF_ISO,
+  featuresLive,
+  OUTCOME_POINTS,
+  EXACT_BONUS,
+  BTTS_REWARD,
+  BTTS_PENALTY,
+  JOKER_WRONG_PENALTY,
+  PERFECT_DAY_BASE,
+  PERFECT_DAY_PER_MATCH,
+} from "@/lib/scoring";
+import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 
-// Shown once to announce the new features (before they unlock too, as a teaser).
-// Replayable via the "What's new" event.
-const KEY = "wc_features_v1";
+// Bumped from wc_features_v1 so EVERY player sees this again — the points system
+// changed and the splash is now a mandatory read (can't be dismissed without
+// stepping through and acknowledging). Replayable via the "What's new" event.
+const KEY = "wc_points_change_v2";
 
 const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
   weekday: "long",
@@ -17,21 +29,90 @@ const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
   minute: "2-digit",
 });
 
-const STEPS: { icon: string; title: string; body: string }[] = [
+// A few representative stages for the match-points table (pulled live from the
+// scoring module so this can never drift from how points are actually awarded).
+const TABLE_STAGES: MatchStage[] = ["group", "r16", "qf", "sf", "final"];
+
+const STREAK_TEXT = "3 in a row +1, 4 → +2, 5 → +3, 6+ → +5";
+
+function PointsTable() {
+  return (
+    <div
+      style={{
+        border: "1px solid var(--line)",
+        borderRadius: 12,
+        overflow: "hidden",
+        marginTop: 14,
+        textAlign: "left",
+      }}
+    >
+      <div
+        className="t-label tnum"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr auto auto auto",
+          gap: 10,
+          padding: "8px 12px",
+          background: "var(--surface-2)",
+          color: "var(--text-3)",
+        }}
+      >
+        <span>Round</span>
+        <span style={{ textAlign: "right" }}>Winner</span>
+        <span style={{ textAlign: "right" }}>+ Score</span>
+        <span style={{ textAlign: "right" }}>Max</span>
+      </div>
+      {TABLE_STAGES.map((s, i) => (
+        <div
+          key={s}
+          className="tnum"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto auto auto",
+            gap: 10,
+            padding: "8px 12px",
+            fontSize: 13,
+            fontWeight: 650,
+            borderTop: i === 0 ? "none" : "1px solid var(--line)",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>{STAGE_LABELS[s]}</span>
+          <span style={{ textAlign: "right" }}>{OUTCOME_POINTS[s]}</span>
+          <span style={{ textAlign: "right", color: "var(--gold-strong)" }}>
+            +{EXACT_BONUS[s]}
+          </span>
+          <span style={{ textAlign: "right", fontWeight: 800 }}>
+            {OUTCOME_POINTS[s] + EXACT_BONUS[s]}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type Step = { icon: string; title: string; body: string; content?: ReactNode };
+
+const STEPS: Step[] = [
+  {
+    icon: "bolt",
+    title: "Important change to points system — please read",
+    body: "Every match is now scored on TWO things: getting the winner right, and getting the exact score right. The exact score is a bonus on top — and it also counts toward your accuracy, so nailing only the winner is a half-right pick.",
+    content: <PointsTable />,
+  },
   {
     icon: "dice",
     title: "New: side bets",
-    body: "On every match you can now add an optional gamble — Both Teams To Score. Call it right and you gain points; get it wrong and you lose them. Only bet when you're sure.",
+    body: `On every match you can add one optional gamble — Both Teams To Score. Call it right: +${BTTS_REWARD}. Get it wrong: ${BTTS_PENALTY}. Only bet when you're sure.`,
   },
   {
     icon: "star",
     title: "Play your joker",
-    body: "Once a day, stake your joker on one match. If your main pick is right it pays double — if it's wrong, it costs you. Choose your spot wisely.",
+    body: `Once a day, stake your joker on one match. If your main pick is right it pays double — if it's wrong, it costs you ${JOKER_WRONG_PENALTY}. Choose your spot wisely.`,
   },
   {
     icon: "flame",
-    title: "Build a streak",
-    body: "Pick correctly match after match to build a streak for bonus points. Miss one — or skip a game — and it resets. Nail a whole matchday for a Perfect Day bonus.",
+    title: "Streaks & Perfect Days",
+    body: `Pick correct results back-to-back for a streak bonus (${STREAK_TEXT}); one miss or a skipped game resets it. And if you pick EVERY match on a day and get them all right, that's a Perfect Day: +${PERFECT_DAY_BASE} plus ${PERFECT_DAY_PER_MATCH} per match.`,
   },
 ];
 
@@ -68,9 +149,11 @@ export function FeatureSplash() {
   const last = step === STEPS.length - 1;
 
   return (
-    <Modal onClose={close} label="What's new">
+    // Not dismissible: backdrop/Escape won't close it — the only way out is to
+    // step through and acknowledge, so the points change can't be skipped.
+    <Modal onClose={() => {}} dismissible={false} label="Important change to points system" maxWidth={420}>
       <div className="trirule" style={{ flex: "none" }} />
-      <div style={{ padding: "26px 22px 20px", textAlign: "center" }}>
+      <div style={{ padding: "26px 22px 20px", textAlign: "center", overflowY: "auto" }}>
         <div
           className="grid place-items-center mx-auto"
           style={{
@@ -90,6 +173,7 @@ export function FeatureSplash() {
         <p className="t-body" style={{ color: "var(--text-2)" }}>
           {s.body}
         </p>
+        {s.content}
 
         {!featuresLive() && (
           <div
@@ -106,7 +190,7 @@ export function FeatureSplash() {
             }}
           >
             <Icon name="lock" size={13} />
-            Unlocks {UNLOCK_LABEL}
+            Bets unlock {UNLOCK_LABEL}
           </div>
         )}
 
@@ -142,7 +226,7 @@ export function FeatureSplash() {
             style={{ flex: 1 }}
             onClick={() => (last ? close() : setStep((v) => v + 1))}
           >
-            {last ? "Let's play" : "Next"}
+            {last ? "I understand" : "Next"}
           </button>
         </div>
       </div>
