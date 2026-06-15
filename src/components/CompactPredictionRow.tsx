@@ -35,9 +35,29 @@ function TickChip({ ok, miss, label }: { ok: boolean; miss?: "bad"; label: strin
 // One row of the My Predictions list. Open matches can be edited inline; settled
 // matches show the result + points; in-progress matches are read-only. Pass
 // `ownerName` when rendering someone else's pick (e.g. the /u/[id] page).
-// Small chip for a settled gamble outcome (green win / red loss).
-function GambleChip({ label, pts, star }: { label: string; pts: number; star?: boolean }) {
-  const good = pts > 0;
+// Chip for a gamble. Settled → green win / red loss with points. Pending (bet
+// placed, match not yet final) → neutral, no number; the joker stays gold-tinted
+// so an in-play joker is obvious.
+function GambleChip({
+  label,
+  pts,
+  star,
+  pending,
+}: {
+  label: string;
+  pts?: number;
+  star?: boolean;
+  pending?: boolean;
+}) {
+  let bg: string, fg: string;
+  if (pending) {
+    bg = star ? "var(--gold-soft)" : "var(--surface-2)";
+    fg = star ? "var(--gold-strong)" : "var(--text-2)";
+  } else {
+    const good = (pts ?? 0) > 0;
+    bg = good ? "var(--good-soft)" : "var(--bad-soft)";
+    fg = good ? "var(--good)" : "var(--bad)";
+  }
   return (
     <span
       className="inline-flex items-center tnum"
@@ -47,12 +67,13 @@ function GambleChip({ label, pts, star }: { label: string; pts: number; star?: b
         fontWeight: 700,
         padding: "3px 8px",
         borderRadius: 999,
-        background: good ? "var(--good-soft)" : "var(--bad-soft)",
-        color: good ? "var(--good)" : "var(--bad)",
+        background: bg,
+        color: fg,
       }}
     >
       {star && <Icon name="star" size={10} sw={2.2} />}
-      {label} {pts > 0 ? `+${pts}` : pts}
+      {label}
+      {pending ? "" : ` ${(pts ?? 0) > 0 ? `+${pts}` : pts}`}
     </span>
   );
 }
@@ -152,16 +173,25 @@ export function CompactPredictionRow({
             )}
           </div>
 
-          {/* settled gamble outcomes */}
-          {settled && ((sideBets && sideBets.length > 0) || (joker && joker.scored)) && (
+          {/* gamble chips — shown once the match has kicked off, whether or not
+              it's settled, so an in-play side bet / joker is visible too. */}
+          {((sideBets && sideBets.length > 0) || joker) && (
             <div className="flex items-center gap-1.5 flex-wrap">
-              {(sideBets ?? [])
-                .filter((b) => b.scored)
-                .map((b) => (
-                  <GambleChip key={b.id} label={sideLabel(b)} pts={b.points_awarded} />
-                ))}
-              {joker && joker.scored && (
-                <GambleChip label="Joker" pts={joker.points_awarded} star />
+              {(sideBets ?? []).map((b) => (
+                <GambleChip
+                  key={b.id}
+                  label={sideLabel(b)}
+                  pts={b.points_awarded}
+                  pending={!b.scored}
+                />
+              ))}
+              {joker && (
+                <GambleChip
+                  label="Joker"
+                  pts={joker.points_awarded}
+                  star
+                  pending={!joker.scored}
+                />
               )}
             </div>
           )}
