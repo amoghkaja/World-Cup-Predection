@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, getLeaderboard, getTeams, podiumWindows } from "@/lib/queries";
+import {
+  getCurrentUser,
+  getLeaderboard,
+  getTeams,
+  podiumWindows,
+  getBoardView,
+  applyNoGambleView,
+} from "@/lib/queries";
 import type {
   GroupPrediction,
   JokerPick,
@@ -57,6 +64,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
     { data: streakRows },
     teams,
     windows,
+    view,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
     getLeaderboard(),
@@ -69,6 +77,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
     supabase.from("streak_bonuses").select("points_awarded").eq("user_id", id),
     getTeams(),
     podiumWindows(),
+    getBoardView(),
   ]);
   if (!prof) notFound();
   const profile = prof as Profile;
@@ -87,7 +96,11 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const podiumRevealed = windows.firstR32Kickoff != null && isLocked(windows.firstR32Kickoff);
   const hasCalls = podiumPicks.length > 0 || goldenBoot != null || groupPicks.length > 0;
 
-  const mine = lb.find((r) => r.user_id === id);
+  // Respect the viewer's board preference (cookie): the no-gambles view shows
+  // this player's standing with side bets + joker stripped out.
+  const norisk = view === "norisk";
+  const board = norisk ? applyNoGambleView(lb) : lb;
+  const mine = board.find((r) => r.user_id === id);
   const rank = mine?.rank ?? null;
   const points = mine?.total_points ?? 0;
 
@@ -116,15 +129,17 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const jokerPts = sum(jokers.filter((j) => j.scored), (j) => j.points_awarded);
   const streakPts = sum(((streakRows ?? []) as { points_awarded: number }[]), (s) => s.points_awarded);
 
-  const breakdown: { label: string; pts: number; hint?: string }[] = [
+  const breakdown: { label: string; pts: number; hint?: string; gamble?: boolean }[] = [
     { label: "Match picks", pts: mainPts },
     { label: "Group stage", pts: groupPts },
     { label: "Golden Boot", pts: tournPts },
     { label: "Podium", pts: podiumPts },
-    { label: "Side bets", pts: sidePts, hint: "both-teams-to-score" },
-    { label: "Joker", pts: jokerPts, hint: "doubled a pick" },
+    { label: "Side bets", pts: sidePts, hint: "both-teams-to-score", gamble: true },
+    { label: "Joker", pts: jokerPts, hint: "doubled a pick", gamble: true },
     { label: "Streak bonus", pts: streakPts, hint: "5 correct in a row" },
-  ].filter((r) => r.pts !== 0);
+    // In the no-gambles view, drop the gamble rows so the breakdown still sums
+    // to the adjusted total shown above.
+  ].filter((r) => r.pts !== 0 && !(norisk && r.gamble));
 
   const firstName = (profile.display_name ?? "this player").split(" ")[0];
 
@@ -149,6 +164,11 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
           <div className="t-sm" style={{ color: "var(--text-3)" }}>
             {points} pts{rank ? ` · Rank #${rank}` : ""}
           </div>
+          {norisk && (
+            <div className="t-xs" style={{ color: "var(--gold-strong)", marginTop: 2, fontWeight: 700 }}>
+              🙈 no-gambles view · not {firstName}&rsquo;s real total
+            </div>
+          )}
         </div>
       </div>
 

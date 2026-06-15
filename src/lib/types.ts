@@ -117,6 +117,8 @@ export interface LeaderboardRow {
   correct_matches: number;
   total_match_preds: number;
   correct_scores?: number | null; // exact-score hits; absent until migration 0009 runs
+  side_bet_points?: number | null; // BTTS side-bet points; absent until migration 0013 runs
+  joker_points?: number | null; // joker double-down points; absent until migration 0013 runs
 }
 
 export const STAGE_LABELS: Record<MatchStage, string> = {
