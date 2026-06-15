@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { MatchStage, MatchStatus, PredOutcome } from "@/lib/types";
 import { elapsedSince, isLocked, zonedDayKey, zonedDayLabel } from "@/lib/format";
-import { maxPointsForStage } from "@/lib/scoring";
+import { maxPointsForStage, tournamentDay } from "@/lib/scoring";
 import { Icon } from "./Icon";
 import { LocalKickoff } from "./LocalTime";
 import { Flag } from "./TeamBadge";
@@ -37,14 +37,6 @@ export type FeedPick = {
   scored: boolean;
 };
 
-// Canonical tournament day (matches SQL tournament_day) for the one-joker-per-day rule.
-const TOURN_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/New_York",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-const tournDay = (iso: string) => TOURN_DAY.format(new Date(iso));
 
 const STAGE_SHORT: Record<MatchStage, string> = {
   group: "Group",
@@ -377,7 +369,7 @@ export function DashboardMatchList({
                   tz={tz}
                   side={sideMap.get(m.id) ?? {}}
                   jokerOnMatch={jokerOnMatch}
-                  jokerUsedElsewhere={!jokerOnMatch && jokerDaySet.has(tournDay(m.kickoff))}
+                  jokerUsedElsewhere={!jokerOnMatch && jokerDaySet.has(tournamentDay(m.kickoff))}
                   live={live}
                   unlockLabel={unlockLabel}
                 />

@@ -7,18 +7,11 @@ import {
   getMyPerfectDays,
 } from "@/lib/queries";
 import { zonedDayKey, zonedDayLabel } from "@/lib/format";
+import { tournamentDay } from "@/lib/scoring";
 import { getViewerTimeZone } from "@/lib/tz";
 import type { MatchWithTeams, Prediction, SideBet } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { CompactPredictionRow } from "@/components/CompactPredictionRow";
-
-// Canonical tournament day (matches SQL tournament_day) for perfect-day badges.
-const TOURN_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/New_York",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
 
 export const dynamic = "force-dynamic";
 
@@ -163,7 +156,7 @@ export default async function PredictionsPage({
       )}
 
       {days.map(([k, items]) => {
-        const perfect = perfectDays.has(TOURN_DAY.format(new Date(items[0].match.kickoff_at)));
+        const perfect = perfectDays.has(tournamentDay(items[0].match.kickoff_at));
         return (
           <div key={k} className="mb-[18px]">
             <div className="flex items-center gap-2 mb-2">

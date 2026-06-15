@@ -10,6 +10,7 @@ import {
   maxPointsForStage,
   featuresLive,
   FEATURE_CUTOFF_ISO,
+  tournamentDay,
 } from "@/lib/scoring";
 import { STAGE_LABELS } from "@/lib/types";
 import { Icon } from "@/components/Icon";
@@ -49,14 +50,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     btts: bttsBet ? (bttsBet.pick === "yes" ? "yes" : "no") : null,
   };
   const jokerOnMatch = jokers.byMatch.has(match.id);
-  const TOURN_DAY = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
   const jokerUsedElsewhere =
-    !jokerOnMatch && jokers.days.has(TOURN_DAY.format(new Date(match.kickoff_at)));
+    !jokerOnMatch && jokers.days.has(tournamentDay(match.kickoff_at));
   const status: "open" | "live" | "done" | "locked" =
     match.status === "final" && match.home_score != null
       ? "done"

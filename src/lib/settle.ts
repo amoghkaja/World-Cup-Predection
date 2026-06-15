@@ -6,6 +6,7 @@ import {
   scoreJoker,
   streakBonusFor,
   perfectDayBonus,
+  tournamentDay,
   PERFECT_DAY_MIN_PICKS,
   type SideBetPick,
 } from "@/lib/scoring";
@@ -19,15 +20,9 @@ async function inChunks<T>(items: T[], fn: (item: T) => Promise<unknown>, size =
   }
 }
 
-// Canonical tournament day (matches SQL tournament_day): a single fixed zone so
-// the "one joker / perfect day per calendar day" rule is identical for everyone.
-const DAY_FMT = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/New_York",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-const canonicalDay = (iso: string) => DAY_FMT.format(new Date(iso));
+// Canonical tournament day lives in @/lib/scoring (tournamentDay) so the SQL
+// function, settlement, and UI can never drift apart.
+const canonicalDay = tournamentDay;
 
 /**
  * Local, per-match settlement: score side bets and resolve any joker for the
