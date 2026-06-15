@@ -1,6 +1,8 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { BOARD_COOKIE, parseBoardView, type BoardView } from "@/lib/board-cookie";
 import { createStaticClient } from "@/lib/supabase/static";
 import type {
   GroupPrediction,
@@ -164,6 +166,39 @@ export const getCurrentStreaks = unstable_cache(
   ["current-streaks"],
   { tags: [TAG_LEADERBOARD], revalidate: 60 }
 );
+
+/** The viewer's leaderboard display preference (cookie-backed, view-only). */
+export async function getBoardView(): Promise<BoardView> {
+  return parseBoardView((await cookies()).get(BOARD_COOKIE)?.value);
+}
+
+/**
+ * Re-rank the board with the risk gambles (side bets + joker) removed — a
+ * view-only "skill-only" standing. Subtracts each row's gamble points, re-sorts
+ * with the same tiebreakers as getLeaderboard, and re-assigns ties-share ranks.
+ * Stored scores are never touched.
+ */
+export function applyNoGambleView(rows: RankedLeaderboardRow[]): RankedLeaderboardRow[] {
+  const adjusted = rows
+    .map((r) => ({
+      ...r,
+      total_points: r.total_points - (r.side_bet_points ?? 0) - (r.joker_points ?? 0),
+    }))
+    .sort(
+      (a, b) =>
+        b.total_points - a.total_points ||
+        b.correct_matches - a.correct_matches ||
+        (a.display_name ?? "").localeCompare(b.display_name ?? "")
+    );
+  let prevPts = NaN;
+  let prevRank = 0;
+  return adjusted.map((r, i) => {
+    const rank = r.total_points === prevPts ? prevRank : i + 1;
+    prevPts = r.total_points;
+    prevRank = rank;
+    return { ...r, rank };
+  });
+}
 
 /** First kickoff of the tournament = the pre-tournament picks lock. */
 export async function tournamentLockAt(): Promise<string | null> {

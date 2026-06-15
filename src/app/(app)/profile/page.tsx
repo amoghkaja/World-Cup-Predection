@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getLeaderboard, getProfile } from "@/lib/queries";
+import { getLeaderboard, getProfile, getBoardView, applyNoGambleView } from "@/lib/queries";
 import { accuracyPct } from "@/lib/scoring";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
@@ -9,8 +9,10 @@ import { AvatarToggle } from "@/components/AvatarToggle";
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const [profile, board] = await Promise.all([getProfile(), getLeaderboard()]);
+  const [profile, real, view] = await Promise.all([getProfile(), getLeaderboard(), getBoardView()]);
 
+  const norisk = view === "norisk";
+  const board = norisk ? applyNoGambleView(real) : real;
   const my = board.find((r) => r.user_id === profile!.id) ?? null;
   const rank = my?.rank ?? null;
   const acc = my ? accuracyPct(my) : 0;
@@ -46,6 +48,11 @@ export default async function ProfilePage() {
             {my?.total_points ?? 0} pts
             {rank ? ` · rank #${rank}` : ""}
           </div>
+          {norisk && (
+            <div className="t-xs" style={{ color: "var(--gold-strong)", marginTop: 2, fontWeight: 700 }}>
+              🙈 no-gambles view · not your real total
+            </div>
+          )}
         </div>
       </div>
 
