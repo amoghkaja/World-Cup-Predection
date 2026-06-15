@@ -86,6 +86,16 @@ export function CompactPredictionRow({
   const locked = isLocked(match.kickoff_at);
   const editable = !locked && !settled;
 
+  // Headline points for the match = main pick + any settled side bets + a
+  // settled joker. The ticks and chips below break it down; the badge is the
+  // single "what this match earned me" number.
+  const sideTotal = (sideBets ?? [])
+    .filter((b) => b.scored)
+    .reduce((s, b) => s + b.points_awarded, 0);
+  const jokerTotal = joker && joker.scored ? joker.points_awarded : 0;
+  const matchTotal = pred.points_awarded + sideTotal + jokerTotal;
+  const hasExtras = sideTotal !== 0 || jokerTotal !== 0;
+
   const [editing, setEditing] = useState(false);
 
   const home = match.home_team;
@@ -163,7 +173,14 @@ export function CompactPredictionRow({
               <TickChip ok={correct} miss="bad" label={actual === "draw" ? "Result" : "Winner"} />
               <TickChip ok={exact} label="Score" />
             </div>
-            <PointsBadge pts={pred.points_awarded} state={pred.points_awarded > 0 ? undefined : "miss"} />
+            <div className="flex flex-col items-end" style={{ gap: 1 }}>
+              <PointsBadge pts={matchTotal} state={matchTotal > 0 ? undefined : "miss"} />
+              {hasExtras && (
+                <span className="t-xs" style={{ color: "var(--text-3)" }}>
+                  total
+                </span>
+              )}
+            </div>
           </div>
         ) : editable ? (
           <button
