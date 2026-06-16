@@ -157,6 +157,23 @@ export async function saveSideBet(input: {
   }
 }
 
+// Remove a side bet before kickoff (changed their mind). The RPC itself guards
+// the deadline; the path revalidation keeps the chips/controls fresh.
+export async function clearSideBet(input: { matchId: number }): Promise<Result> {
+  try {
+    const { supabase } = await requireUser();
+    if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
+    const { error } = await supabase.rpc("clear_side_bet", { p_match_id: input.matchId });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/dashboard");
+    revalidatePath(`/matches/${input.matchId}`);
+    revalidatePath("/predictions");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 // ---------------- Joker / double-down ----------------
 export async function saveJoker(input: { matchId: number }): Promise<Result> {
   try {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveSideBet, saveJoker, clearJoker } from "@/app/actions";
+import { saveSideBet, clearSideBet, saveJoker, clearJoker } from "@/app/actions";
 import { BTTS_REWARD, BTTS_PENALTY, JOKER_WRONG_PENALTY } from "@/lib/scoring";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
@@ -53,10 +53,16 @@ export function SideBetControls({
   }
 
   function pickBtts(v: "yes" | "no") {
-    if (!live) return;
+    if (!live || btts === v) return; // already on this pick — nothing to save
     const prev = btts;
     setBtts(v);
     run(() => saveSideBet({ matchId, pick: v }), () => setBtts(prev));
+  }
+  function clearBtts() {
+    if (!live || btts === null) return;
+    const prev = btts;
+    setBtts(null);
+    run(() => clearSideBet({ matchId }), () => setBtts(prev));
   }
   function toggleJoker() {
     if (!live || (jokerUsedElsewhere && !jok)) return;
@@ -142,6 +148,28 @@ export function SideBetControls({
             No
           </button>
         </div>
+        {/* remove the bet if they change their mind (only while open) */}
+        <button
+          type="button"
+          aria-label="Remove side bet"
+          title="Remove bet"
+          disabled={frozen}
+          onClick={clearBtts}
+          className="grid place-items-center press"
+          style={{
+            width: 32,
+            height: 32,
+            flex: "none",
+            borderRadius: 999,
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
+            color: "var(--text-3)",
+            visibility: btts === null ? "hidden" : "visible",
+            cursor: frozen ? "not-allowed" : "pointer",
+          }}
+        >
+          <Icon name="x" size={14} sw={2.4} />
+        </button>
       </div>
 
       {/* Joker */}
