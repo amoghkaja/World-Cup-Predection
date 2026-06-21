@@ -87,7 +87,7 @@ export function LeaderboardRow({
               fontSize: 9.5,
               fontWeight: 800,
               lineHeight: 1,
-              color: delta > 0 ? "var(--up, #16a34a)" : "var(--down, #dc2626)",
+              color: delta > 0 ? "var(--good)" : "var(--bad)",
             }}
             title={delta > 0 ? `Up ${delta} since yesterday` : `Down ${-delta} since yesterday`}
           >

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
+import { Flag } from "./TeamBadge";
 
 export interface RecapEntry {
   id: number;
@@ -117,8 +118,10 @@ export function PointsRecap({
                 background: "var(--surface-2)",
               }}
             >
-              <span className="tnum" style={{ fontWeight: 700, fontSize: 13.5 }}>
-                {e.homeFlag ?? ""} {e.home} {e.hs}–{e.as} {e.away} {e.awayFlag ?? ""}
+              <span className="inline-flex items-center tnum" style={{ gap: 6, fontWeight: 700, fontSize: 13.5 }}>
+                <Flag flag={e.homeFlag} name={e.home} size="sm" />
+                <span>{e.home} {e.hs}–{e.as} {e.away}</span>
+                <Flag flag={e.awayFlag} name={e.away} size="sm" />
               </span>
               <span className="t-xs tnum" style={{ color: "var(--text-3)", flex: 1 }}>
                 you said {e.ph}–{e.pa}
