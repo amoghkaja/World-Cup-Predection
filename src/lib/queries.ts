@@ -116,7 +116,7 @@ export const getLeaderboard = unstable_cache(
     const { data } = await supabase.from("leaderboard").select("*");
 
     // Yesterday/earlier-today rank per user, for movement arrows. Best-effort:
-    // if migration 0014 hasn't run yet, just skip arrows.
+    // if migration 0015 hasn't run yet, just skip arrows.
     const snap = new Map<string, number>();
     try {
       const { data: snaps } = await supabase.from("rank_snapshots").select("user_id, rank");
