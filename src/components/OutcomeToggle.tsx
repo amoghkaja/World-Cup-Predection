@@ -26,7 +26,9 @@ export function OutcomeToggle({
       aria-label="Match outcome"
       style={{
         display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr",
+        // "Draw" takes only what it needs so the team-name buttons get the rest —
+        // keeps long names ("Saudi Arabia") readable down to 320px.
+        gridTemplateColumns: "1fr auto 1fr",
         gap: 5,
         background: "var(--surface-2)",
         padding: 4,
@@ -48,9 +50,9 @@ export function OutcomeToggle({
               border: "none",
               borderRadius: 9,
               minHeight: 42,
-              padding: "0 6px",
+              padding: o.k === "D" ? "0 12px" : "0 6px",
               fontWeight: 700,
-              fontSize: 14,
+              fontSize: 13.5,
               background: on ? "var(--brand)" : "transparent",
               color: on ? "var(--on-brand)" : "var(--text-2)",
               whiteSpace: "nowrap",

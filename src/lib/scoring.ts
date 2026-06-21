@@ -116,12 +116,12 @@ export function scorePodium(position: number, correct: boolean, revised: boolean
 
 export type SideBetPick = "yes" | "no";
 
-// --- Both teams to score: a true ~50/50 in almost every match, so a flat
-// (slightly inviting) payout. The only side bet — Over/Under was dropped because
-// without per-match odds it mispriced lopsided games and the safe lines were
-// mildly farmable.
+// --- Both teams to score: a true ~50/50 in almost every match, so a SYMMETRIC
+// payout — a blind "yes"/"no" is EV-neutral, removing any free edge. The only
+// side bet — Over/Under was dropped because without per-match odds it mispriced
+// lopsided games and the safe lines were mildly farmable.
 export const BTTS_REWARD = 3;
-export const BTTS_PENALTY = -2;
+export const BTTS_PENALTY = -3;
 
 export function actualBtts(home: number, away: number): "yes" | "no" {
   return home > 0 && away > 0 ? "yes" : "no";
