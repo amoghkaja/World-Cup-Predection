@@ -126,7 +126,7 @@ const BERLIN_DAY = new Intl.DateTimeFormat("en-CA", {
  * Capture each player's current rank ONCE per tournament (Berlin) day, so the
  * leaderboard can show movement arrows (today's rank vs this snapshot). Safe to
  * call every sync — it no-ops if a snapshot already exists for today. Best-effort:
- * if the table isn't there yet (migration 0014 not run) it silently does nothing.
+ * if the table isn't there yet (migration 0015 not run) it silently does nothing.
  */
 export async function captureDailyRankSnapshot(admin: Admin): Promise<void> {
   try {
