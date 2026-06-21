@@ -2,6 +2,7 @@ import { getMatches, getMyPredictions } from "@/lib/queries";
 import { STAGE_LABELS, type MatchStage, type MatchWithTeams } from "@/lib/types";
 import { BracketNode } from "@/components/BracketNode";
 import { Icon } from "@/components/Icon";
+import { Flag } from "@/components/TeamBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function BracketPage() {
           <Icon name="trophy" size={15} style={{ color: "var(--gold-strong)" }} />
           {champion ? (
             <span className="inline-flex items-center gap-1.5">
-              <span>{champion.flag_emoji}</span>
+              <Flag flag={champion.flag_emoji} name={champion.name} size="sm" />
               {champion.name}
             </span>
           ) : (
@@ -98,8 +99,12 @@ export default async function BracketPage() {
                 border: champion ? "1px solid var(--gold)" : "1px dashed var(--line-strong)",
               }}
             >
-              <div style={{ fontSize: 30, marginBottom: 6 }}>
-                {champion ? champion.flag_emoji : "🏆"}
+              <div className="flex justify-center" style={{ marginBottom: 6 }}>
+                {champion ? (
+                  <Flag flag={champion.flag_emoji} name={champion.name} size="lg" />
+                ) : (
+                  <span style={{ fontSize: 30 }}>🏆</span>
+                )}
               </div>
               <div
                 style={{
