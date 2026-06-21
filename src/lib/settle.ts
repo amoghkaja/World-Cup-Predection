@@ -114,3 +114,62 @@ export async function recomputeStreaks(admin: Admin): Promise<void> {
   await admin.from("streak_bonuses").delete().neq("user_id", ZERO);
   if (streakRows.length) await admin.from("streak_bonuses").insert(streakRows);
 }
+
+const BERLIN_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Berlin",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Capture each player's current rank ONCE per tournament (Berlin) day, so the
+ * leaderboard can show movement arrows (today's rank vs this snapshot). Safe to
+ * call every sync — it no-ops if a snapshot already exists for today. Best-effort:
+ * if the table isn't there yet (migration 0014 not run) it silently does nothing.
+ */
+export async function captureDailyRankSnapshot(admin: Admin): Promise<void> {
+  try {
+    const { data: latest } = await admin
+      .from("rank_snapshots")
+      .select("captured_at")
+      .order("captured_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const today = BERLIN_DAY.format(new Date());
+    if (latest && BERLIN_DAY.format(new Date((latest as { captured_at: string }).captured_at)) === today) {
+      return; // already captured today
+    }
+
+    const { data } = await admin
+      .from("leaderboard")
+      .select("user_id, total_points, correct_matches, display_name");
+    const rows = ((data ?? []) as {
+      user_id: string;
+      total_points: number;
+      correct_matches: number;
+      display_name: string | null;
+    }[]).sort(
+      (a, b) =>
+        b.total_points - a.total_points ||
+        b.correct_matches - a.correct_matches ||
+        (a.display_name ?? "").localeCompare(b.display_name ?? "")
+    );
+    if (rows.length === 0) return;
+
+    let prevPts = NaN;
+    let prevRank = 0;
+    const snap = rows.map((r, i) => {
+      const rank = r.total_points === prevPts ? prevRank : i + 1;
+      prevPts = r.total_points;
+      prevRank = rank;
+      return { user_id: r.user_id, rank, captured_at: new Date().toISOString() };
+    });
+
+    const ZERO = "00000000-0000-0000-0000-000000000000";
+    await admin.from("rank_snapshots").delete().neq("user_id", ZERO);
+    await admin.from("rank_snapshots").insert(snap);
+  } catch {
+    // table missing or transient error — movement arrows are best-effort
+  }
+}

@@ -4,7 +4,7 @@ import { revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { TAG_LEADERBOARD, TAG_MATCHES, TAG_PLAYERS } from "@/lib/queries";
 import { scorePrediction } from "@/lib/scoring";
-import { settleMatchSideEffects, recomputeStreaks } from "@/lib/settle";
+import { settleMatchSideEffects, recomputeStreaks, captureDailyRankSnapshot } from "@/lib/settle";
 import type { Match, MatchStage, Prediction, Team } from "@/lib/types";
 
 // Single call to football-data.org returns all 104 World Cup matches. We update
@@ -330,6 +330,9 @@ export async function GET(req: NextRequest) {
     await recomputeStreaks(admin);
     revalidateTag(TAG_LEADERBOARD, "max");
   }
+  // Once-per-day rank snapshot for the leaderboard movement arrows (no-ops if
+  // already captured today). Cheap and runs every sync so the day rolls over.
+  await captureDailyRankSnapshot(admin);
   if (playersImported > 0) {
     revalidateTag(TAG_PLAYERS, "max");
   }
