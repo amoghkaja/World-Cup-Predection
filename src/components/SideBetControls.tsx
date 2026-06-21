@@ -117,8 +117,8 @@ export function SideBetControls({
           onClick={() => setHelp(true)}
           className="grid place-items-center press"
           style={{
-            width: 34,
-            height: 34,
+            width: 40,
+            height: 40,
             borderRadius: 999,
             border: "1px solid var(--line)",
             background: "var(--surface)",
@@ -157,8 +157,8 @@ export function SideBetControls({
           onClick={clearBtts}
           className="grid place-items-center press"
           style={{
-            width: 32,
-            height: 32,
+            width: 40,
+            height: 40,
             flex: "none",
             borderRadius: 999,
             border: "1px solid var(--line)",
@@ -177,6 +177,11 @@ export function SideBetControls({
         type="button"
         disabled={frozen || (jokerUsedElsewhere && !jok)}
         onClick={toggleJoker}
+        title={
+          jokerUsedElsewhere && !jok
+            ? "One joker per day. Remove it on the other match to move it here."
+            : undefined
+        }
         className="press flex items-center"
         style={{
           gap: 10,
@@ -190,10 +195,16 @@ export function SideBetControls({
       >
         <Icon name="star" size={18} sw={2} style={{ color: jok ? "var(--gold-strong)" : "var(--text-3)" }} />
         <span style={{ flex: 1, textAlign: "left", fontWeight: 700, fontSize: 13.5, color: jok ? "var(--on-gold)" : "var(--text)" }}>
-          {jok ? "Joker on this match — doubles your pick" : "Play your joker (doubles or penalises)"}
+          {jok
+            ? "Joker on this match — doubles your pick"
+            : jokerUsedElsewhere
+              ? "Joker is on another match today"
+              : "Play your joker (doubles or penalises)"}
         </span>
         {jokerUsedElsewhere && !jok && (
-          <span className="t-xs" style={{ color: "var(--text-3)" }}>used today</span>
+          <span className="t-xs" style={{ color: "var(--text-3)", textAlign: "right", maxWidth: 92 }}>
+            remove it there to move
+          </span>
         )}
       </button>
 

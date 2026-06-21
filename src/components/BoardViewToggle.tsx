@@ -15,10 +15,11 @@ export function BoardViewToggle({ view }: { view: BoardView }) {
   function toggle() {
     const next: BoardView = on ? "real" : "norisk";
     // 30-day persistent preference; expire it to go back to the real board.
+    // samesite=strict so a cross-site request can't flip a viewer's board view.
     document.cookie =
       next === "norisk"
-        ? `${BOARD_COOKIE}=norisk; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax`
-        : `${BOARD_COOKIE}=; path=/; max-age=0; samesite=lax`;
+        ? `${BOARD_COOKIE}=norisk; path=/; max-age=${60 * 60 * 24 * 30}; samesite=strict`
+        : `${BOARD_COOKIE}=; path=/; max-age=0; samesite=strict`;
     startTransition(() => router.refresh());
   }
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { MatchWithTeams, Prediction, SideBet, JokerPick } from "@/lib/types";
-import { actualOutcomeForMatch } from "@/lib/scoring";
+import { actualOutcomeForMatch, BTTS_REWARD, BTTS_PENALTY, JOKER_WRONG_PENALTY } from "@/lib/scoring";
 import { isLocked } from "@/lib/format";
 import { Flag } from "@/components/TeamBadge";
 import { Icon } from "@/components/Icon";
@@ -43,11 +43,14 @@ function GambleChip({
   pts,
   star,
   pending,
+  stakes,
 }: {
   label: string;
   pts?: number;
   star?: boolean;
   pending?: boolean;
+  // Shown while the bet is still pending so players see the risk/reward up front.
+  stakes?: string;
 }) {
   let bg: string, fg: string;
   if (pending) {
@@ -73,7 +76,11 @@ function GambleChip({
     >
       {star && <Icon name="star" size={10} sw={2.2} />}
       {label}
-      {pending ? "" : ` ${(pts ?? 0) > 0 ? `+${pts}` : pts}`}
+      {pending ? (
+        stakes ? <span style={{ opacity: 0.7, fontWeight: 600 }}> {stakes}</span> : ""
+      ) : (
+        ` ${(pts ?? 0) > 0 ? `+${pts}` : pts}`
+      )}
     </span>
   );
 }
@@ -183,6 +190,7 @@ export function CompactPredictionRow({
                   label={sideLabel(b)}
                   pts={b.points_awarded}
                   pending={!b.scored}
+                  stakes={`+${BTTS_REWARD}/${BTTS_PENALTY}`}
                 />
               ))}
               {joker && (
@@ -191,6 +199,7 @@ export function CompactPredictionRow({
                   pts={joker.points_awarded}
                   star
                   pending={!joker.scored}
+                  stakes={`×2/${JOKER_WRONG_PENALTY}`}
                 />
               )}
             </div>
@@ -207,7 +216,7 @@ export function CompactPredictionRow({
               <PointsBadge pts={matchTotal} state={matchTotal > 0 ? undefined : "miss"} />
               {hasExtras && (
                 <span className="t-xs" style={{ color: "var(--text-3)" }}>
-                  total
+                  pick + bets
                 </span>
               )}
             </div>
