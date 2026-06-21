@@ -22,6 +22,7 @@ import {
 import { type SideState } from "@/components/SideBetControls";
 import { Icon } from "@/components/Icon";
 import { SetupChecklist } from "@/components/SetupChecklist";
+import { StreakTracker } from "@/components/StreakTracker";
 import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
 
 export const dynamic = "force-dynamic";
@@ -183,6 +184,8 @@ export default async function DashboardPage() {
           ))}
         </div>
       </div>
+
+      <StreakTracker streak={streak} />
 
       {gated ? (
         <>

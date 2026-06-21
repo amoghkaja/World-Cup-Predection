@@ -103,7 +103,7 @@ export const getPlayers = unstable_cache(
   { tags: [TAG_PLAYERS], revalidate: 3600 }
 );
 
-export type RankedLeaderboardRow = LeaderboardRow & { rank: number };
+export type RankedLeaderboardRow = LeaderboardRow & { rank: number; prevRank?: number | null };
 
 /**
  * Leaderboard sorted by points, then correct results, then name — ties share a
@@ -114,6 +114,19 @@ export const getLeaderboard = unstable_cache(
   async (): Promise<RankedLeaderboardRow[]> => {
     const supabase = createStaticClient();
     const { data } = await supabase.from("leaderboard").select("*");
+
+    // Yesterday/earlier-today rank per user, for movement arrows. Best-effort:
+    // if migration 0014 hasn't run yet, just skip arrows.
+    const snap = new Map<string, number>();
+    try {
+      const { data: snaps } = await supabase.from("rank_snapshots").select("user_id, rank");
+      for (const s of (snaps ?? []) as { user_id: string; rank: number }[]) {
+        snap.set(s.user_id, s.rank);
+      }
+    } catch {
+      /* table not present yet */
+    }
+
     const rows = ((data ?? []) as LeaderboardRow[]).sort(
       (a, b) =>
         b.total_points - a.total_points ||
@@ -126,7 +139,7 @@ export const getLeaderboard = unstable_cache(
       const rank = r.total_points === prevPts ? prevRank : i + 1;
       prevPts = r.total_points;
       prevRank = rank;
-      return { ...r, rank };
+      return { ...r, rank, prevRank: snap.get(r.user_id) ?? null };
     });
   },
   ["leaderboard"],
@@ -196,7 +209,8 @@ export function applyNoGambleView(rows: RankedLeaderboardRow[]): RankedLeaderboa
     const rank = r.total_points === prevPts ? prevRank : i + 1;
     prevPts = r.total_points;
     prevRank = rank;
-    return { ...r, rank };
+    // No movement arrows on the view-only no-gamble board (snapshot is the real board).
+    return { ...r, rank, prevRank: null };
   });
 }
 

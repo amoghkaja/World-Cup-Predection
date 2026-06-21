@@ -91,6 +91,7 @@ export default async function LeaderboardPage() {
               me={me(r)}
               last={i === rows.length - 1}
               streak={streaks[r.user_id] ?? 0}
+              delta={!norisk && r.prevRank != null ? r.prevRank - r.rank : null}
             />
           ))}
         </div>

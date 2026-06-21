@@ -18,6 +18,7 @@ export function LeaderboardRow({
   me,
   last,
   streak = 0,
+  delta = null,
 }: {
   row: LeaderboardRowData;
   rank: number;
@@ -25,6 +26,8 @@ export function LeaderboardRow({
   last?: boolean;
   // Current correct-result run; shown as a flame once it's a real streak (≥2).
   streak?: number;
+  // Rank movement vs the day's start: positive = climbed, negative = dropped.
+  delta?: number | null;
 }) {
   const acc = accuracyPct(row);
   const medal = MEDALS[rank];
@@ -42,39 +45,57 @@ export function LeaderboardRow({
         borderBottom: last ? "none" : "1px solid var(--line)",
       }}
     >
-      {medal ? (
-        <span
-          className="tnum grid place-items-center"
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            flex: "none",
-            background: medal.bg,
-            color: medal.fg,
-            fontFamily: "var(--font-display)",
-            fontWeight: 800,
-            fontSize: 13.5,
-          }}
-        >
-          {rank}
-        </span>
-      ) : (
-        <span
-          className="tnum"
-          style={{
-            width: 26,
-            textAlign: "center",
-            flex: "none",
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 15,
-            color: "var(--text-3)",
-          }}
-        >
-          {rank}
-        </span>
-      )}
+      <div
+        className="flex flex-col items-center"
+        style={{ width: 26, flex: "none", gap: 1 }}
+      >
+        {medal ? (
+          <span
+            className="tnum grid place-items-center"
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: medal.bg,
+              color: medal.fg,
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: 13.5,
+            }}
+          >
+            {rank}
+          </span>
+        ) : (
+          <span
+            className="tnum"
+            style={{
+              textAlign: "center",
+              fontFamily: "var(--font-display)",
+              fontWeight: 700,
+              fontSize: 15,
+              color: "var(--text-3)",
+            }}
+          >
+            {rank}
+          </span>
+        )}
+        {delta != null && delta !== 0 && (
+          <span
+            className="inline-flex items-center tnum"
+            style={{
+              gap: 1,
+              fontSize: 9.5,
+              fontWeight: 800,
+              lineHeight: 1,
+              color: delta > 0 ? "var(--up, #16a34a)" : "var(--down, #dc2626)",
+            }}
+            title={delta > 0 ? `Up ${delta} since yesterday` : `Down ${-delta} since yesterday`}
+          >
+            {delta > 0 ? "▲" : "▼"}
+            {Math.abs(delta)}
+          </span>
+        )}
+      </div>
       <Avatar name={row.display_name ?? "?"} src={row.avatar_url} size={38} />
       <div className="flex-1 min-w-0">
         <div className="truncate" style={{ fontWeight: me ? 750 : 650, fontSize: 14.5 }}>
