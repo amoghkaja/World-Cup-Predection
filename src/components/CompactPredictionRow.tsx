@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { MatchWithTeams, Prediction, SideBet, JokerPick } from "@/lib/types";
-import { actualOutcomeForMatch, BTTS_REWARD, BTTS_PENALTY, KO_SIDE_BET, JOKER_PENALTY_BY_STAGE } from "@/lib/scoring";
+import type { MatchStage, MatchWithTeams, Prediction, SideBet, JokerPick } from "@/lib/types";
+import { actualOutcomeForMatch, BTTS_REWARD, KO_SIDE_BET, JOKER_PENALTY_BY_STAGE, bttsPenaltyFor } from "@/lib/scoring";
 import { isLocked, decidedNote } from "@/lib/format";
 import { Flag } from "@/components/TeamBadge";
 import { Icon } from "@/components/Icon";
@@ -86,18 +86,17 @@ function GambleChip({
 }
 
 function sideLabel(b: SideBet): string {
-  const yn = b.pick === "yes" ? "Y" : "N";
-  if (b.market === "et") return `ET ${yn}`;
-  if (b.market === "pens") return `Pens ${yn}`;
-  return `BTTS ${yn}`;
+  if (b.market === "et") return "To ET";
+  if (b.market === "pens") return "Pens";
+  return `BTTS ${b.pick === "yes" ? "Y" : "N"}`;
 }
 
-function sideStakes(b: SideBet): string {
+function sideStakes(b: SideBet, stage: MatchStage): string {
   if (b.market === "et" || b.market === "pens") {
-    const t = KO_SIDE_BET[b.market][b.pick];
+    const t = KO_SIDE_BET[b.market];
     return `+${t.win}/${t.miss}`;
   }
-  return `+${BTTS_REWARD}/${BTTS_PENALTY}`;
+  return `+${BTTS_REWARD}/${bttsPenaltyFor(stage)}`;
 }
 
 export function CompactPredictionRow({
@@ -202,7 +201,7 @@ export function CompactPredictionRow({
                   label={sideLabel(b)}
                   pts={b.points_awarded}
                   pending={!b.scored}
-                  stakes={sideStakes(b)}
+                  stakes={sideStakes(b, match.stage)}
                 />
               ))}
               {joker && (

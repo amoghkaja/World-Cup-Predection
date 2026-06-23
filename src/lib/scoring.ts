@@ -116,20 +116,31 @@ export function scorePodium(position: number, correct: boolean, revised: boolean
 
 export type SideBetPick = "yes" | "no";
 
-// --- Both teams to score: a true ~50/50 in almost every match, so a SYMMETRIC
-// payout — a blind "yes"/"no" is EV-neutral, removing any free edge. The only
-// side bet — Over/Under was dropped because without per-match odds it mispriced
-// lopsided games and the safe lines were mildly farmable.
+// --- Both teams to score. Win pays +3. The miss penalty is STAGE-SCALED: the
+// group stage keeps the original lighter -2 (those bets were placed under that
+// rule, so we never change them retroactively); knockouts (R32+) use the
+// symmetric -3, which removes the small +EV edge a blind call had at -2.
 export const BTTS_REWARD = 3;
-export const BTTS_PENALTY = -3;
+export const BTTS_PENALTY = -3; // knockouts (R32+)
+export const BTTS_PENALTY_GROUP = -2; // group stage (grandfathered)
 
 export function actualBtts(home: number, away: number): "yes" | "no" {
   return home > 0 && away > 0 ? "yes" : "no";
 }
 
+/** The BTTS miss penalty for a stage: group -2, knockouts -3. */
+export function bttsPenaltyFor(stage: MatchStage): number {
+  return stage === "group" ? BTTS_PENALTY_GROUP : BTTS_PENALTY;
+}
+
 /** Points for one settled BTTS side bet, from the stored 90' score. */
-export function scoreSideBet(pick: SideBetPick, home: number, away: number): number {
-  return pick === actualBtts(home, away) ? BTTS_REWARD : BTTS_PENALTY;
+export function scoreSideBet(
+  pick: SideBetPick,
+  home: number,
+  away: number,
+  stage: MatchStage
+): number {
+  return pick === actualBtts(home, away) ? BTTS_REWARD : bttsPenaltyFor(stage);
 }
 
 // --- Knockout-only side bets: "goes to extra time?" and "decided on penalties?".
@@ -139,9 +150,16 @@ export function scoreSideBet(pick: SideBetPick, home: number, away: number): num
 // pens p≈0.17 — you must genuinely lean that way to profit.
 export type KoMarket = "et" | "pens";
 
-export const KO_SIDE_BET: Record<KoMarket, Record<SideBetPick, { win: number; miss: number }>> = {
-  et: { yes: { win: 4, miss: -2 }, no: { win: 2, miss: -5 } },
-  pens: { yes: { win: 5, miss: -1 }, no: { win: 1, miss: -6 } },
+// "Goes to extra time?" / "Decided on penalties?" are OPT-IN long-shot bets — you
+// only ever back the YES (the rarer, exciting outcome). There's deliberately no
+// "no" side: a two-sided market on a ~16–30% event forces ugly lopsided odds (a
+// +1 win that risks −6), so instead you simply don't place the bet if you reckon
+// it won't happen. A win pays well; a miss is a small fixed cost. Tuned to ≤0 EV
+// at WC base rates (ET≈30%, pens≈16%) so it can't be farmed, but reading a tight
+// tie right is rewarded.
+export const KO_SIDE_BET: Record<KoMarket, { win: number; miss: number }> = {
+  et: { win: 4, miss: -2 }, // P(ET)≈0.30 → EV ≈ −0.2
+  pens: { win: 5, miss: -1 }, // P(pens)≈0.16 → EV ≈ −0.04
 };
 
 export function actualEt(decidedIn: MatchDecidedIn | null | undefined): "yes" | "no" {
@@ -151,15 +169,15 @@ export function actualPens(decidedIn: MatchDecidedIn | null | undefined): "yes" 
   return decidedIn === "penalties" ? "yes" : "no";
 }
 
-/** Points for one settled knockout side bet, from how the tie was decided. */
-export function scoreKoSideBet(
-  market: KoMarket,
-  pick: SideBetPick,
-  decidedIn: MatchDecidedIn | null | undefined
-): number {
-  const actual = market === "et" ? actualEt(decidedIn) : actualPens(decidedIn);
-  const t = KO_SIDE_BET[market][pick];
-  return pick === actual ? t.win : t.miss;
+/**
+ * Points for one settled knockout side bet. The bet is always "yes, it WILL go
+ * to extra time / penalties", so it pays `win` when that happened and `miss`
+ * otherwise.
+ */
+export function scoreKoSideBet(market: KoMarket, decidedIn: MatchDecidedIn | null | undefined): number {
+  const happened = (market === "et" ? actualEt(decidedIn) : actualPens(decidedIn)) === "yes";
+  const t = KO_SIDE_BET[market];
+  return happened ? t.win : t.miss;
 }
 
 // --- Joker / double-down: doubles a correct main pick (pays its base points

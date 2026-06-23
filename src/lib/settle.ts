@@ -38,9 +38,9 @@ export async function settleMatchSideEffects(admin: Admin, match: Match): Promis
       // ET/pens settle from how the tie was decided — wait if that hasn't landed yet
       // (e.g. the feed marked it final before regularTime/duration arrived).
       if (match.decided_in == null) return;
-      pts = scoreKoSideBet(b.market as KoMarket, b.pick as SideBetPick, match.decided_in);
+      pts = scoreKoSideBet(b.market as KoMarket, match.decided_in);
     } else {
-      pts = scoreSideBet(b.pick as SideBetPick, home, away);
+      pts = scoreSideBet(b.pick as SideBetPick, home, away, match.stage);
     }
     await admin.from("side_bets").update({ points_awarded: pts, scored: true }).eq("id", b.id);
   });
