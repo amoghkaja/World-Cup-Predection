@@ -171,10 +171,16 @@ export function PredictionForm({
         </div>
       </div>
 
+      {isKnockout && (
+        <p className="t-xs text-center" style={{ color: "var(--text-3)", marginTop: -4 }}>
+          Scored at 90 minutes — extra time &amp; pens only decide who goes through.
+        </p>
+      )}
+
       {isKnockout && home === away && !disabled && (
         <div className="flex flex-col items-center" style={{ gap: 6 }}>
           <span className="t-xs" style={{ color: "var(--text-3)" }}>
-            Who advances (after extra time / pens)?
+            Who goes through (after extra time / pens)?
           </span>
           <div className="flex" style={{ gap: 8 }}>
             {(["home", "away"] as const).map((side) => {

@@ -1,4 +1,4 @@
-import type { Match, MatchStage, PredOutcome, Prediction } from "@/lib/types";
+import type { Match, MatchDecidedIn, MatchStage, PredOutcome, Prediction } from "@/lib/types";
 
 /**
  * Scoring model (v2): round-weighted match points + exact-score bonus — NO time multiplier.
@@ -127,18 +127,60 @@ export function actualBtts(home: number, away: number): "yes" | "no" {
   return home > 0 && away > 0 ? "yes" : "no";
 }
 
-/** Points for one settled side bet, from the stored full-time score. */
+/** Points for one settled BTTS side bet, from the stored 90' score. */
 export function scoreSideBet(pick: SideBetPick, home: number, away: number): number {
   return pick === actualBtts(home, away) ? BTTS_REWARD : BTTS_PENALTY;
 }
 
+// --- Knockout-only side bets: "goes to extra time?" and "decided on penalties?".
+// Settled purely from match.decided_in (clean + unambiguous). Payouts are
+// ASYMMETRIC so the minority outcome ("yes") pays more and a blind/standing pick
+// is ≤0 EV at the WC base rates (P(ET)≈0.30, P(pens)≈0.16): ET break-even p≈0.33,
+// pens p≈0.17 — you must genuinely lean that way to profit.
+export type KoMarket = "et" | "pens";
+
+export const KO_SIDE_BET: Record<KoMarket, Record<SideBetPick, { win: number; miss: number }>> = {
+  et: { yes: { win: 4, miss: -2 }, no: { win: 2, miss: -5 } },
+  pens: { yes: { win: 5, miss: -1 }, no: { win: 1, miss: -6 } },
+};
+
+export function actualEt(decidedIn: MatchDecidedIn | null | undefined): "yes" | "no" {
+  return decidedIn === "extra_time" || decidedIn === "penalties" ? "yes" : "no";
+}
+export function actualPens(decidedIn: MatchDecidedIn | null | undefined): "yes" | "no" {
+  return decidedIn === "penalties" ? "yes" : "no";
+}
+
+/** Points for one settled knockout side bet, from how the tie was decided. */
+export function scoreKoSideBet(
+  market: KoMarket,
+  pick: SideBetPick,
+  decidedIn: MatchDecidedIn | null | undefined
+): number {
+  const actual = market === "et" ? actualEt(decidedIn) : actualPens(decidedIn);
+  const t = KO_SIDE_BET[market][pick];
+  return pick === actual ? t.win : t.miss;
+}
+
 // --- Joker / double-down: doubles a correct main pick (pays its base points
-// again), or costs a flat penalty when the main pick is wrong. Relies on a
-// wrong main pick scoring exactly 0.
+// again — upside already scales with the bigger knockout points), or costs a
+// stage-scaled penalty when the main pick is wrong. Relies on a wrong main pick
+// scoring exactly 0. JOKER_WRONG_PENALTY is the base/group value, kept as a
+// scalar for generic copy; JOKER_PENALTY_BY_STAGE is authoritative for scoring.
 export const JOKER_WRONG_PENALTY = -4;
 
-export function scoreJoker(mainPoints: number): number {
-  return mainPoints > 0 ? mainPoints : JOKER_WRONG_PENALTY;
+export const JOKER_PENALTY_BY_STAGE: Record<MatchStage, number> = {
+  group: -4,
+  r32: -4,
+  r16: -5,
+  qf: -6,
+  sf: -7,
+  third: -5,
+  final: -8,
+};
+
+export function scoreJoker(mainPoints: number, stage: MatchStage): number {
+  return mainPoints > 0 ? mainPoints : JOKER_PENALTY_BY_STAGE[stage];
 }
 
 // --- Streak: consecutive correct main results, in kickoff order (any wrong OR
@@ -148,10 +190,28 @@ export function scoreJoker(mainPoints: number): number {
 // match falls under, so it's fair across timezones (replaced the perfect-day
 // bonus, which did depend on day grouping).
 export const STREAK_TARGET = 5;
+// Base reward (group level). The actual payout scales with the round the run
+// lands on, so a streak sustained deep into the knockouts is worth much more.
 export const STREAK_REWARD = 10;
 
-export function streakBonusFor(streakLen: number): number {
-  return streakLen > 0 && streakLen % STREAK_TARGET === 0 ? STREAK_REWARD : 0;
+export const STREAK_STAGE_MULT: Record<MatchStage, number> = {
+  group: 1,
+  r32: 1,
+  r16: 1.5,
+  qf: 2,
+  sf: 2.5,
+  third: 1.5,
+  final: 3,
+};
+
+/**
+ * Bonus when the run reaches a multiple of STREAK_TARGET, scaled by the stage of
+ * the match that COMPLETES the run (deeper rounds come later, so the reward grows
+ * as the tournament progresses): group/r32 +10, QF +20, final +30.
+ */
+export function streakBonusFor(streakLen: number, completingStage: MatchStage): number {
+  if (!(streakLen > 0 && streakLen % STREAK_TARGET === 0)) return 0;
+  return Math.round(STREAK_REWARD * STREAK_STAGE_MULT[completingStage]);
 }
 
 // --- Canonical league day for the "one joker per day" allowance: a single

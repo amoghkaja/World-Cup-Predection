@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { MatchWithTeams } from "@/lib/types";
-import { isLocked } from "@/lib/format";
+import { isLocked, decidedNote } from "@/lib/format";
 import { Flag } from "./TeamBadge";
 import { Icon } from "./Icon";
 import { StatusPill } from "./StatusPill";
@@ -100,6 +100,14 @@ export function BracketNode({
       </div>
       {row(match.home_team, match.home_placeholder, match.home_score, true)}
       {row(match.away_team, match.away_placeholder, match.away_score, false)}
+      {done && decidedNote(match) && (
+        <div
+          className="t-xs text-center"
+          style={{ color: "var(--text-3)", padding: "3px 0 5px", background: "var(--surface-2)" }}
+        >
+          {decidedNote(match)}
+        </div>
+      )}
     </Link>
   );
 }

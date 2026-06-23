@@ -2,6 +2,10 @@ export type MatchStage = "group" | "r32" | "r16" | "qf" | "sf" | "third" | "fina
 export type MatchStatus = "scheduled" | "live" | "final";
 export type PredOutcome = "home" | "away" | "draw";
 export type TournamentPredType = "champion" | "finalist" | "golden_boot";
+// How a knockout tie was settled (null for group games / not-yet-final matches).
+export type MatchDecidedIn = "regular" | "extra_time" | "penalties";
+// Side-bet markets: BTTS on any match; ET/pens only on knockouts.
+export type SideBetMarket = "btts" | "et" | "pens";
 
 export interface Team {
   id: number;
@@ -21,10 +25,17 @@ export interface Match {
   home_placeholder: string | null;
   away_placeholder: string | null;
   kickoff_at: string;
-  home_score: number | null;
+  home_score: number | null; // 90-minute (regulation) score
   away_score: number | null;
-  winner_team_id: number | null;
+  winner_team_id: number | null; // advancer for knockouts (incl. ET/pens winner)
   status: MatchStatus;
+  // Knockout result detail (all null for group games / not-yet-final). home_score/
+  // away_score stay the 90' score; these describe how the tie was settled.
+  decided_in?: MatchDecidedIn | null;
+  et_home?: number | null; // score after extra time (full 120'), if any
+  et_away?: number | null;
+  pens_home?: number | null; // shootout score, if any
+  pens_away?: number | null;
 }
 
 export interface MatchWithTeams extends Match {
@@ -84,7 +95,8 @@ export interface SideBet {
   id: number;
   user_id: string;
   match_id: number;
-  pick: "yes" | "no"; // both-teams-to-score
+  market: SideBetMarket; // 'btts' (any match) | 'et' | 'pens' (knockouts)
+  pick: "yes" | "no";
   submitted_at: string;
   points_awarded: number;
   scored: boolean;

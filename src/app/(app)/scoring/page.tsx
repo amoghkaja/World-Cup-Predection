@@ -7,7 +7,8 @@ import {
   maxPointsForStage,
   BTTS_REWARD,
   BTTS_PENALTY,
-  JOKER_WRONG_PENALTY,
+  JOKER_PENALTY_BY_STAGE,
+  KO_SIDE_BET,
   STREAK_TARGET,
   STREAK_REWARD,
   FEATURE_CUTOFF_ISO,
@@ -245,6 +246,19 @@ export default function ScoringPage() {
         })}
       </div>
 
+      {/* knockout scoring note */}
+      <div className="card mb-3" style={{ padding: "13px 16px", borderLeft: "3px solid var(--blue, var(--brand))" }}>
+        <div style={{ fontWeight: 800, fontSize: 13.5, marginBottom: 2 }}>
+          Knockouts: who goes through is the points
+        </div>
+        <div className="t-sm" style={{ color: "var(--text-2)" }}>
+          In a knockout the <strong>Result</strong> points go to picking the team that{" "}
+          <strong>advances</strong> — get the survivor wrong and the match scores 0, even if you
+          nailed the scoreline. The exact-score bonus is judged at <strong>90 minutes</strong>;
+          extra time and penalties only decide who goes through.
+        </div>
+      </div>
+
       {/* accuracy callout */}
       <div
         className="card flex gap-3 items-start mb-3"
@@ -445,30 +459,52 @@ export default function ScoringPage() {
           {/* BTTS */}
           <Row
             title="Side bet · both teams to score?"
-            desc="Yes/No on any match — the only side bet. Right: you gain; wrong: you lose points."
+            desc="Yes/No on any match. Right: you gain; wrong: you lose points."
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{BTTS_REWARD}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
             <span style={{ color: "var(--bad)", fontWeight: 800 }}>{BTTS_PENALTY}</span>
           </Row>
 
+          {/* Extra time (knockouts) */}
+          <Row
+            title="Side bet · goes to extra time? (knockouts)"
+            desc={`Yes pays +${KO_SIDE_BET.et.yes.win}/${KO_SIDE_BET.et.yes.miss}, No pays +${KO_SIDE_BET.et.no.win}/${KO_SIDE_BET.et.no.miss}. Yes is the rarer call, so it pays more.`}
+          >
+            <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.et.yes.win}</span>
+            <span style={{ color: "var(--text-3)" }}> / </span>
+            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{KO_SIDE_BET.et.yes.miss}</span>
+          </Row>
+
+          {/* Penalties (knockouts) */}
+          <Row
+            title="Side bet · decided on penalties? (knockouts)"
+            desc={`Yes pays +${KO_SIDE_BET.pens.yes.win}/${KO_SIDE_BET.pens.yes.miss}, No pays +${KO_SIDE_BET.pens.no.win}/${KO_SIDE_BET.pens.no.miss}. A shootout is rare — backing it pays the most.`}
+          >
+            <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.pens.yes.win}</span>
+            <span style={{ color: "var(--text-3)" }}> / </span>
+            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{KO_SIDE_BET.pens.yes.miss}</span>
+          </Row>
+
           {/* Joker */}
           <Row
             title="Joker · double-down"
-            desc="One per day. Doubles your match points if the pick is right; a flat penalty if wrong."
+            desc={`One per day. Doubles your match points if the pick is right; if wrong it costs you — a penalty that grows in the later rounds (${JOKER_PENALTY_BY_STAGE.group} early to ${JOKER_PENALTY_BY_STAGE.final} in the final).`}
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>×2</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
-            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{JOKER_WRONG_PENALTY}</span>
+            <span style={{ color: "var(--bad)", fontWeight: 800 }}>
+              {JOKER_PENALTY_BY_STAGE.group} to {JOKER_PENALTY_BY_STAGE.final}
+            </span>
           </Row>
 
           {/* Streak */}
           <Row
             title={`Streak · ${STREAK_TARGET} in a row`}
-            desc={`Get the result right on ${STREAK_TARGET} matches in a row (kickoff order). One wrong or skipped game resets your run to zero.`}
+            desc={`Get the result right on ${STREAK_TARGET} matches in a row (kickoff order). One wrong or skipped game resets your run to zero. The bonus grows the deeper the run goes — +${STREAK_REWARD} in the groups, up to +${STREAK_REWARD * 3} on the final.`}
           >
             <span className="tnum" style={{ color: "var(--gold-strong)", fontWeight: 800 }}>
-              +{STREAK_REWARD} every {STREAK_TARGET}
+              +{STREAK_REWARD}→+{STREAK_REWARD * 3}
             </span>
           </Row>
         </div>
