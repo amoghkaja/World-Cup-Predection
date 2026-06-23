@@ -154,14 +154,18 @@ export type KoMarket = "et" | "pens";
 // only ever back the YES (the rarer, exciting outcome). There's deliberately no
 // "no" side: a two-sided market on a ~20-30% event forces ugly lopsided odds (a
 // +1 win that risks −6), so instead you simply don't place the bet if you reckon
-// it won't happen. Payouts are set against the historical base rates so a BLIND
-// "always bet yes" is ≤0 EV (can't be farmed) while a genuine read is rewarded:
-//   ET   ≈ 30% of WC knockouts  → +4/−2  (break-even 33%, fairly priced for ~1-in-3)
-//   pens ≈ 20% of elimination games since 1986 (Opta) → +5/−2 (break-even ~29%, house edge at 20%)
+// it won't happen. Payouts are deliberately CONSERVATIVE — the break-even win
+// rate sits ABOVE the worst historical rate, so a blind "always bet yes" is
+// firmly −EV (no farmable edge) even in an outlier tournament; only a strong read
+// of a specific tie profits:
+//   ET   ≈ 30% of WC knockouts → +3/−2, break-even 40% (the R32 round, being more
+//         lopsided, should only lower the ET rate)
+//   pens ≈ 20% since 1986 (Opta), peak 31% in 2022 → +4/−2, break-even 33% (above
+//         even that record). pens pays more than ET because it's rarer.
 // (pens ⊂ ET: a shootout also counts as "went to extra time".)
 export const KO_SIDE_BET: Record<KoMarket, { win: number; miss: number }> = {
-  et: { win: 4, miss: -2 }, // EV ≈ 0.30·4 − 0.70·2 = −0.2
-  pens: { win: 5, miss: -2 }, // EV ≈ 0.20·5 − 0.80·2 = −0.6  (was -1 → +EV at the true 20% rate)
+  et: { win: 3, miss: -2 }, // EV ≈ 0.30·3 − 0.70·2 = −0.5
+  pens: { win: 4, miss: -2 }, // EV ≈ 0.20·4 − 0.80·2 = −0.8
 };
 
 export function actualEt(decidedIn: MatchDecidedIn | null | undefined): "yes" | "no" {
