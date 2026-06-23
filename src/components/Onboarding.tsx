@@ -21,12 +21,12 @@ const STEPS: { icon: string; title: string; body: string }[] = [
   {
     icon: "target",
     title: "Then predict every match",
-    body: "Call the result and exact score of each game. The right result earns points, the exact scoreline adds a bonus, and deeper rounds are worth more. Edit freely until kickoff — every time shown is in your local timezone.",
+    body: "Call the result and exact score of each game. The right result earns points, the exact scoreline adds a bonus, and deeper rounds are worth more. Edit freely until kickoff — all times are shown in your local timezone.",
   },
   {
     icon: "medal",
     title: "The podium pays the most",
-    body: "Your champion, runner-up and third place lock at the first kickoff for the full reward. After the groups finish you get one chance to revise them — for slightly fewer points.",
+    body: "Your champion, runner-up and third place lock at the first kickoff for the full reward. After the groups finish, you get one chance to revise them — for slightly fewer points.",
   },
   {
     icon: "bolt",

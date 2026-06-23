@@ -18,7 +18,7 @@ const KO_QUESTION: Record<"et" | "pens", string> = {
 
 /**
  * Opt-in gambles for a single match plus the once-per-day joker. Every match
- * offers Both-teams-to-score (a Yes/No coin-flip). Knockouts add two YES-only
+ * offers Both-teams-to-score (a Yes/No call). Knockouts add two YES-only
  * long-shots — "goes to extra time?" and "decided on penalties?" — that you back
  * when you sense a tight tie. Shown only for eligible, still-open matches; writes
  * go through RPC-backed server actions.
@@ -157,10 +157,10 @@ export function SideBetControls({
         </button>
       </div>
 
-      {/* BTTS — a Yes/No coin-flip on every match */}
+      {/* BTTS — a Yes/No call on every match */}
       <div className="flex items-center" style={{ gap: 10 }}>
         <span className="t-sm" style={{ flex: 1, fontWeight: 600 }}>
-          Both teams score?
+          Both teams to score?
           <span className="t-xs tnum" style={{ display: "block", color: "var(--text-3)" }}>
             win +{BTTS_REWARD} · miss {bttsMiss}
           </span>
@@ -307,7 +307,7 @@ export function SideBetControls({
             </p>
             <div className="flex flex-col gap-2">
               {[
-                ["Both teams to score", `A coin-flip yes/no call — win +${BTTS_REWARD}, miss ${bttsMiss}.`],
+                ["Both teams to score", `A yes/no call — win +${BTTS_REWARD}, a miss costs ${Math.abs(bttsMiss)}.`],
                 ...(isKnockout
                   ? ([
                       [

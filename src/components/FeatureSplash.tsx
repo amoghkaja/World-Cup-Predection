@@ -96,14 +96,14 @@ type Step = { icon: string; title: string; body: string; content?: ReactNode };
 const STEPS: Step[] = [
   {
     icon: "bolt",
-    title: "Knockouts are here — who goes through is the points",
+    title: "Knockouts are here — picking who advances earns the points",
     body: "In a knockout the big points go to picking the team that ADVANCES — get the survivor wrong and the match scores 0, even if you nailed the score. The exact-score bonus is judged at 90 minutes; extra time and penalties only decide who goes through (you'll see “a.e.t.” or “won 4-2 on pens”).",
     content: <PointsTable />,
   },
   {
     icon: "dice",
     title: "New: knockout side bets",
-    body: `Two opt-in long-shots on knockout ties, alongside Both Teams To Score: “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) and “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). You only back YES — skip it if you reckon it ends in 90. (Heads up: a missed BTTS cost ${BTTS_PENALTY_GROUP} in the groups and is ${BTTS_PENALTY} from the Round of 32 on.)`,
+    body: `Two opt-in long-shots on knockout ties, alongside Both Teams To Score: “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) and “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). You only back YES — skip it if you reckon it ends in 90. (Heads up: a missed BTTS costs ${Math.abs(BTTS_PENALTY_GROUP)} in the groups, ${Math.abs(BTTS_PENALTY)} from the Round of 32 on.)`,
   },
   {
     icon: "flame",
