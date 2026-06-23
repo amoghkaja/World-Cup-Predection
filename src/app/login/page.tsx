@@ -53,8 +53,8 @@ export default async function LoginPage({
         </div>
         <div className="trirule" style={{ maxWidth: 110 }} />
         <p className="t-xs" style={{ color: "var(--text-3)" }}>
-          Predictions lock at kickoff · Group picks, podium &amp; Golden Boot lock at the first
-          match
+          Predictions lock at kickoff · Group picks, podium &amp; Golden Boot lock at the
+          tournament&rsquo;s first kickoff
         </p>
       </div>
     </main>

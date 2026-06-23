@@ -250,7 +250,7 @@ export default function ScoringPage() {
       {/* knockout scoring note */}
       <div className="card mb-3" style={{ padding: "13px 16px", borderLeft: "3px solid var(--blue, var(--brand))" }}>
         <div style={{ fontWeight: 800, fontSize: 13.5, marginBottom: 2 }}>
-          Knockouts: who goes through is the points
+          Knockouts: picking who advances earns the points
         </div>
         <div className="t-sm" style={{ color: "var(--text-2)" }}>
           In a knockout the <strong>Result</strong> points go to picking the team that{" "}
@@ -460,7 +460,7 @@ export default function ScoringPage() {
           {/* BTTS */}
           <Row
             title="Side bet · both teams to score?"
-            desc={`Yes/No on any match. Win +${BTTS_REWARD}; a miss cost ${BTTS_PENALTY_GROUP} in the group stage and ${BTTS_PENALTY} from the Round of 32 on.`}
+            desc={`Yes/No on any match. Win +${BTTS_REWARD}; a miss costs ${Math.abs(BTTS_PENALTY_GROUP)} in the group stage and ${Math.abs(BTTS_PENALTY)} from the Round of 32 on.`}
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{BTTS_REWARD}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
