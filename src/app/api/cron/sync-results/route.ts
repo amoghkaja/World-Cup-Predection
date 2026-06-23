@@ -36,6 +36,10 @@ interface FdTeam {
   name: string | null;
   tla: string | null;
 }
+interface FdScore {
+  home: number | null;
+  away: number | null;
+}
 interface FdMatch {
   id: number;
   utcDate: string;
@@ -44,7 +48,14 @@ interface FdMatch {
   group: string | null;
   homeTeam: FdTeam;
   awayTeam: FdTeam;
-  score: { winner: string | null; fullTime: { home: number | null; away: number | null } };
+  score: {
+    winner: string | null;
+    duration?: string | null; // "REGULAR" | "EXTRA_TIME" | "PENALTY_SHOOTOUT"
+    fullTime: FdScore; // cumulative total — INCLUDES extra-time AND shootout goals
+    regularTime?: FdScore | null; // 90-minute score; what we store as home/away
+    extraTime?: FdScore | null; // goals scored only in ET
+    penalties?: FdScore | null; // shootout-only goals
+  };
 }
 interface FdResponse {
   matches?: FdMatch[];
@@ -146,6 +157,7 @@ export async function GET(req: NextRequest) {
     applied: [] as number[],
     unresolved: new Set<string>(),
     unmatched: [] as string[],
+    deferred: [] as string[], // KO finished beyond regulation but regularTime not in yet
   };
 
   async function applyMatch(our: Match, fx: FdMatch, homeId: number | null, awayId: number | null) {
@@ -161,14 +173,31 @@ export async function GET(req: NextRequest) {
       report.teamsSet++;
     }
 
-    const ft = fx.score.fullTime;
-    const finished = FINISHED.has(fx.status) && ft.home != null && ft.away != null && teamsKnown;
+    // football-data v4: score.fullTime is the CUMULATIVE total (incl. extra time
+    // AND the shootout) — a 1-1 won on pens reports fullTime {7,6}. We store the
+    // 90-MINUTE score (score.regularTime), falling back to fullTime only for
+    // regulation matches (group games / KO decided in 90', where they're equal).
+    const dur = (fx.score.duration ?? "REGULAR").toUpperCase();
+    const beyondReg = dur === "EXTRA_TIME" || dur === "PENALTY_SHOOTOUT";
+    const reg: FdScore | null =
+      fx.score.regularTime?.home != null ? fx.score.regularTime : beyondReg ? null : fx.score.fullTime;
+    const scoreReady = reg != null && reg.home != null && reg.away != null;
+
+    // Delay guard: if the feed says a knockout went to ET/pens but regularTime
+    // hasn't landed yet (free-tier lag), DON'T finalize off the cumulative score —
+    // wait for the next poll. Mirror it as "live" below.
+    if (FINISHED.has(fx.status) && teamsKnown && beyondReg && !scoreReady) {
+      report.deferred.push(our.label ?? String(our.id));
+    }
+
+    const finished = FINISHED.has(fx.status) && scoreReady && teamsKnown;
     let needRescore = false;
-    if (finished) {
+    if (finished && reg) {
       const ourHomeId = (updates.home_team_id as number | undefined) ?? our.home_team_id;
       const sameOrder = ourHomeId === homeId;
-      const oh = sameOrder ? ft.home : ft.away;
-      const oa = sameOrder ? ft.away : ft.home;
+      const flip = (s: FdScore): { home: number | null; away: number | null } =>
+        sameOrder ? { home: s.home, away: s.away } : { home: s.away, away: s.home };
+      const { home: oh, away: oa } = flip(reg);
       const winnerId =
         our.stage === "group"
           ? null
@@ -177,16 +206,36 @@ export async function GET(req: NextRequest) {
             : fx.score.winner === "AWAY_TEAM"
               ? awayId
               : null;
+      // How the tie was decided (group rows always null → behaves exactly as before).
+      const decidedIn =
+        our.stage === "group"
+          ? null
+          : dur === "PENALTY_SHOOTOUT"
+            ? "penalties"
+            : dur === "EXTRA_TIME"
+              ? "extra_time"
+              : "regular";
+      const et = fx.score.extraTime?.home != null ? flip(fx.score.extraTime) : { home: null, away: null };
+      const pens =
+        fx.score.penalties?.home != null ? flip(fx.score.penalties) : { home: null, away: null };
       if (
         our.status !== "final" ||
         our.home_score !== oh ||
         our.away_score !== oa ||
-        our.winner_team_id !== winnerId
+        our.winner_team_id !== winnerId ||
+        (our.decided_in ?? null) !== decidedIn ||
+        (our.pens_home ?? null) !== pens.home ||
+        (our.et_home ?? null) !== et.home
       ) {
         updates.home_score = oh;
         updates.away_score = oa;
         updates.winner_team_id = winnerId;
         updates.status = "final";
+        updates.decided_in = decidedIn;
+        updates.et_home = et.home;
+        updates.et_away = et.away;
+        updates.pens_home = pens.home;
+        updates.pens_away = pens.away;
         needRescore = true;
       }
     }
@@ -357,6 +406,8 @@ export async function GET(req: NextRequest) {
       home: fx.homeTeam?.tla ?? fx.homeTeam?.name ?? "?",
       away: fx.awayTeam?.tla ?? fx.awayTeam?.name ?? "?",
       ft: fx.score.fullTime,
+      reg: fx.score.regularTime ?? null,
+      duration: fx.score.duration ?? null,
       winner: fx.score.winner,
     }));
 
@@ -370,6 +421,7 @@ export async function GET(req: NextRequest) {
     applied: report.applied,
     unresolvedTeams: [...report.unresolved],
     unmatched: report.unmatched,
+    deferred: report.deferred,
     feed: { stageCounts, recent },
   });
 }

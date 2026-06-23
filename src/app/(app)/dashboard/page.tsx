@@ -102,10 +102,15 @@ export default async function DashboardPage() {
       },
     ]);
 
-  // Side bets (BTTS) + joker for the shown (upcoming) matches.
-  const sides: [number, SideState][] = [...sideBets.values()]
-    .filter((b) => upcomingIds.has(b.match_id))
-    .map((b) => [b.match_id, { btts: b.pick === "yes" ? "yes" : "no" }]);
+  // Side bets (BTTS + knockout ET/pens) + joker for the shown (upcoming) matches.
+  // Collapse each match's bets into one SideState ({ btts?, et?, pens? }).
+  const sides: [number, SideState][] = [...sideBets.entries()]
+    .filter(([matchId]) => upcomingIds.has(matchId))
+    .map(([matchId, bets]) => {
+      const st: SideState = {};
+      for (const b of bets) st[b.market] = b.pick;
+      return [matchId, st];
+    });
   const jokerMatches = [...jokers.byMatch.keys()].filter((id) => upcomingIds.has(id));
   const jokerDays = [...jokers.days];
 

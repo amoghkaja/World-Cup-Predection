@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMatch, getMyPredictions, getMySideBets, getMyJokers, getSetupStatus } from "@/lib/queries";
-import { isLocked, zonedDayLabel } from "@/lib/format";
+import { isLocked, zonedDayLabel, decidedNote } from "@/lib/format";
 import { getViewerTimeZone } from "@/lib/tz";
 import { LocalTime } from "@/components/LocalTime";
 import {
@@ -44,11 +44,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const live = featuresLive();
   const unlockLabel = zonedDayLabel(FEATURE_CUTOFF_ISO, tz);
 
-  // Current side-bet + joker state for this match.
-  const bttsBet = sideBets.get(match.id);
-  const sideState: SideState = {
-    btts: bttsBet ? (bttsBet.pick === "yes" ? "yes" : "no") : null,
-  };
+  // Current side-bet + joker state for this match (BTTS + any knockout markets).
+  const sideState: SideState = {};
+  for (const b of sideBets.get(match.id) ?? []) sideState[b.market] = b.pick;
   const jokerOnMatch = jokers.byMatch.has(match.id);
   const jokerUsedElsewhere =
     !jokerOnMatch && jokers.days.has(tournamentDay(match.kickoff_at));
@@ -132,6 +130,12 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           </span>
           <Flag flag={match.away_team?.flag_emoji} name={awayName} size="lg" />
         </div>
+
+        {status === "done" && decidedNote(match) && (
+          <p className="t-xs text-center" style={{ color: "var(--text-3)", marginTop: 6 }}>
+            {decidedNote(match)}
+          </p>
+        )}
 
         {existing && (
           <div className="flex justify-center" style={{ paddingBottom: 4 }}>
@@ -222,6 +226,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             <div style={{ borderTop: "1px dashed var(--line)", marginTop: 14, paddingTop: 10 }}>
               <SideBetControls
                 matchId={match.id}
+                stage={match.stage}
                 side={sideState}
                 joker={jokerOnMatch}
                 jokerUsedElsewhere={jokerUsedElsewhere}

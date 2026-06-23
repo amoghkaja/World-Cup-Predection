@@ -254,15 +254,19 @@ export const getMyPredictions = cache(async (): Promise<Map<number, Prediction>>
   return map;
 });
 
-// Per-user side bets, keyed by match id (one BTTS bet per match). Request-scoped
+// Per-user side bets, keyed by match id. A match can now hold several markets
+// (BTTS, plus the knockout ET/pens bets), so each entry is a LIST. Request-scoped
 // cache only — never unstable_cache (would leak one player's bets to another).
-export const getMySideBets = cache(async (): Promise<Map<number, SideBet>> => {
+export const getMySideBets = cache(async (): Promise<Map<number, SideBet[]>> => {
   const user = await getCurrentUser();
-  const map = new Map<number, SideBet>();
+  const map = new Map<number, SideBet[]>();
   if (!user) return map;
   const supabase = await createClient();
   const { data } = await supabase.from("side_bets").select("*").eq("user_id", user.id);
-  (data ?? []).forEach((b) => map.set((b as SideBet).match_id, b as SideBet));
+  (data ?? []).forEach((row) => {
+    const b = row as SideBet;
+    (map.get(b.match_id) ?? map.set(b.match_id, []).get(b.match_id)!).push(b);
+  });
   return map;
 });
 

@@ -14,6 +14,28 @@ export function elapsedSince(iso: string, ms: number, now: number = Date.now()):
   return now >= new Date(iso).getTime() + ms;
 }
 
+/**
+ * Short note for how a knockout tie was settled — "a.e.t." or "4–2 on pens" —
+ * or null for a 90-minute result / group game. The stored home_score/away_score
+ * are always the 90' score; this annotates everything beyond it.
+ */
+export function decidedNote(m: {
+  decided_in?: string | null;
+  pens_home?: number | null;
+  pens_away?: number | null;
+}): string | null {
+  if (!m.decided_in || m.decided_in === "regular") return null;
+  if (m.decided_in === "penalties") {
+    if (m.pens_home != null && m.pens_away != null) {
+      const hi = Math.max(m.pens_home, m.pens_away);
+      const lo = Math.min(m.pens_home, m.pens_away);
+      return `${hi}–${lo} on pens`;
+    }
+    return "on pens";
+  }
+  return "a.e.t.";
+}
+
 /* ------------------------------------------------------------------ */
 /* Day grouping in the VIEWER's timezone.                              */
 /* The tz string travels server → client as a prop (sourced from the   */

@@ -3,9 +3,11 @@ import {
   FEATURE_CUTOFF_ISO,
   featuresActiveFor,
   scoreSideBet,
+  scoreKoSideBet,
   scoreJoker,
   streakBonusFor,
   type SideBetPick,
+  type KoMarket,
 } from "@/lib/scoring";
 import type { Match } from "@/lib/types";
 
@@ -28,10 +30,18 @@ export async function settleMatchSideEffects(admin: Admin, match: Match): Promis
   const home = match.home_score;
   const away = match.away_score;
 
-  // --- side bets ---
+  // --- side bets (BTTS on any match; ET/pens on knockouts) ---
   const { data: bets } = await admin.from("side_bets").select("*").eq("match_id", match.id);
   await inChunks(bets ?? [], async (b) => {
-    const pts = scoreSideBet(b.pick as SideBetPick, home, away);
+    let pts: number;
+    if (b.market === "et" || b.market === "pens") {
+      // ET/pens settle from how the tie was decided — wait if that hasn't landed yet
+      // (e.g. the feed marked it final before regularTime/duration arrived).
+      if (match.decided_in == null) return;
+      pts = scoreKoSideBet(b.market as KoMarket, b.pick as SideBetPick, match.decided_in);
+    } else {
+      pts = scoreSideBet(b.pick as SideBetPick, home, away);
+    }
     await admin.from("side_bets").update({ points_awarded: pts, scored: true }).eq("id", b.id);
   });
 
@@ -45,7 +55,7 @@ export async function settleMatchSideEffects(admin: Admin, match: Match): Promis
     const mainPts = new Map<string, number>();
     (preds ?? []).forEach((p) => mainPts.set(p.user_id, p.points_awarded));
     await inChunks(jokers, async (j) => {
-      const pts = scoreJoker(mainPts.get(j.user_id) ?? 0);
+      const pts = scoreJoker(mainPts.get(j.user_id) ?? 0, match.stage);
       await admin.from("joker_picks").update({ points_awarded: pts, scored: true }).eq("id", j.id);
     });
   }
@@ -62,7 +72,7 @@ export async function recomputeStreaks(admin: Admin): Promise<void> {
   // Eligible settled matches in chronological order.
   const { data: matchRows } = await admin
     .from("matches")
-    .select("id, kickoff_at, home_score, away_score, status")
+    .select("id, kickoff_at, home_score, away_score, status, stage")
     .gte("kickoff_at", FEATURE_CUTOFF_ISO)
     .order("kickoff_at")
     .order("id");
@@ -101,7 +111,7 @@ export async function recomputeStreaks(admin: Admin): Promise<void> {
     for (const m of settled) {
       if (right.has(m.id)) {
         run += 1;
-        const pts = streakBonusFor(run);
+        const pts = streakBonusFor(run, m.stage);
         streakRows.push({ user_id: u, match_id: m.id, streak_len: run, points_awarded: pts });
       } else {
         run = 0; // wrong pick or didn't pick this settled match

@@ -242,6 +242,7 @@ export function MatchRow({
             <div style={{ borderTop: "1px dashed var(--line)", paddingTop: 4 }}>
               <SideBetControls
                 matchId={m.id}
+                stage={m.stage}
                 side={side}
                 joker={jokerOnMatch}
                 jokerUsedElsewhere={jokerUsedElsewhere}

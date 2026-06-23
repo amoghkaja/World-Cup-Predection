@@ -19,7 +19,7 @@ import {
   type SideBetPick,
 } from "@/lib/scoring";
 import { settleMatchSideEffects, recomputeStreaks } from "@/lib/settle";
-import type { Match, PodiumPosition, PredOutcome, Prediction } from "@/lib/types";
+import type { Match, PodiumPosition, PredOutcome, Prediction, SideBetMarket } from "@/lib/types";
 
 type Result<T = void> = { ok: true; data?: T } | { ok: false; error: string };
 
@@ -121,6 +121,7 @@ export async function savePrediction(input: {
 // ---------------- Side bet: Both teams to score (opt-in gamble) ----------------
 export async function saveSideBet(input: {
   matchId: number;
+  market: SideBetMarket;
   pick: SideBetPick;
 }): Promise<Result> {
   try {
@@ -128,6 +129,9 @@ export async function saveSideBet(input: {
 
     if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
     if (input.pick !== "yes" && input.pick !== "no") return { ok: false, error: "Invalid pick" };
+    if (input.market !== "btts" && input.market !== "et" && input.market !== "pens") {
+      return { ok: false, error: "Invalid market" };
+    }
 
     if (!featuresLive()) return { ok: false, error: "Side bets unlock Monday." };
 
@@ -136,9 +140,14 @@ export async function saveSideBet(input: {
     if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
       return { ok: false, error: "This match is locked — the deadline has passed." };
     }
+    // BTTS is allowed on any match; the ET/pens markets only exist in knockouts.
+    if ((input.market === "et" || input.market === "pens") && match.stage === "group") {
+      return { ok: false, error: "That bet is knockouts only." };
+    }
 
     const { error } = await supabase.rpc("save_side_bet", {
       p_match_id: input.matchId,
+      p_market: input.market,
       p_pick: input.pick,
     });
     if (error) {
@@ -159,11 +168,17 @@ export async function saveSideBet(input: {
 
 // Remove a side bet before kickoff (changed their mind). The RPC itself guards
 // the deadline; the path revalidation keeps the chips/controls fresh.
-export async function clearSideBet(input: { matchId: number }): Promise<Result> {
+export async function clearSideBet(input: { matchId: number; market: SideBetMarket }): Promise<Result> {
   try {
     const { supabase } = await requireUser();
     if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
-    const { error } = await supabase.rpc("clear_side_bet", { p_match_id: input.matchId });
+    if (input.market !== "btts" && input.market !== "et" && input.market !== "pens") {
+      return { ok: false, error: "Invalid market" };
+    }
+    const { error } = await supabase.rpc("clear_side_bet", {
+      p_match_id: input.matchId,
+      p_market: input.market,
+    });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/dashboard");
     revalidatePath(`/matches/${input.matchId}`);
@@ -389,9 +404,14 @@ export async function updateDisplayName(name: string): Promise<Result> {
 // ---------------- Admin: enter result & rescore ----------------
 export async function saveMatchResult(input: {
   matchId: number;
-  homeScore: number;
+  homeScore: number; // 90-minute score
   awayScore: number;
   winnerTeamId: number | null; // advancer for knockout draws
+  decidedIn?: "regular" | "extra_time" | "penalties" | null;
+  etHome?: number | null;
+  etAway?: number | null;
+  pensHome?: number | null;
+  pensAway?: number | null;
 }): Promise<Result> {
   try {
     await requireAdmin();
@@ -416,8 +436,13 @@ export async function saveMatchResult(input: {
     }
 
     // Winner: derived from the score when decisive; required for level knockouts;
-    // always null for group games.
+    // always null for group games. home/away are the 90-MINUTE score.
     let winner: number | null = null;
+    let decidedIn: "regular" | "extra_time" | "penalties" | null = null;
+    let etHome: number | null = null;
+    let etAway: number | null = null;
+    let pensHome: number | null = null;
+    let pensAway: number | null = null;
     if (m.stage !== "group") {
       if (home > away) winner = m.home_team_id;
       else if (away > home) winner = m.away_team_id;
@@ -426,6 +451,24 @@ export async function saveMatchResult(input: {
           return { ok: false, error: "A drawn knockout needs an advancer." };
         }
         winner = input.winnerTeamId;
+      }
+      // How the tie was decided: default to regular when decisive at 90', penalties
+      // when level (the admin can override to extra_time).
+      decidedIn = input.decidedIn ?? (home === away ? "penalties" : "regular");
+      if (decidedIn !== "regular" && decidedIn !== "extra_time" && decidedIn !== "penalties") {
+        return { ok: false, error: "Invalid 'decided in' value." };
+      }
+      if (home === away && decidedIn === "regular") {
+        return { ok: false, error: "A level knockout must be decided in extra time or penalties." };
+      }
+      const opt = (v: number | null | undefined): number | null =>
+        v == null ? null : isIntIn(v, 0, 40) ? v : NaN;
+      etHome = opt(input.etHome);
+      etAway = opt(input.etAway);
+      pensHome = opt(input.pensHome);
+      pensAway = opt(input.pensAway);
+      if ([etHome, etAway, pensHome, pensAway].some((v) => Number.isNaN(v))) {
+        return { ok: false, error: "Invalid extra-time / penalty score." };
       }
     }
 
@@ -436,6 +479,11 @@ export async function saveMatchResult(input: {
         away_score: away,
         winner_team_id: winner,
         status: "final",
+        decided_in: decidedIn,
+        et_home: etHome,
+        et_away: etAway,
+        pens_home: pensHome,
+        pens_away: pensAway,
       })
       .eq("id", input.matchId)
       .select("*")

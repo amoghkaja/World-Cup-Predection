@@ -17,8 +17,18 @@ export function AdminMatchRow({ match, teams }: { match: MatchWithTeams; teams: 
   const [home, setHome] = useState(match.home_score ?? 0);
   const [away, setAway] = useState(match.away_score ?? 0);
   const [winner, setWinner] = useState<number | "">(match.winner_team_id ?? "");
+  const [decidedIn, setDecidedIn] = useState<"regular" | "extra_time" | "penalties">(
+    (match.decided_in as "regular" | "extra_time" | "penalties" | null) ?? "regular"
+  );
+  const [pensHome, setPensHome] = useState(match.pens_home ?? 0);
+  const [pensAway, setPensAway] = useState(match.pens_away ?? 0);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+
+  // home/away are the 90' score: a decisive 90' is always "regular"; a level
+  // knockout must be extra time or penalties (default penalties).
+  const decided: "regular" | "extra_time" | "penalties" =
+    home !== away ? "regular" : decidedIn === "regular" ? "penalties" : decidedIn;
 
   function saveTeams() {
     setMsg(null);
@@ -43,6 +53,9 @@ export function AdminMatchRow({ match, teams }: { match: MatchWithTeams; teams: 
         homeScore: home,
         awayScore: away,
         winnerTeamId: w,
+        decidedIn: isKnockout ? decided : undefined,
+        pensHome: isKnockout && decided === "penalties" ? pensHome : undefined,
+        pensAway: isKnockout && decided === "penalties" ? pensAway : undefined,
       });
       setMsg(res.ok ? "Result saved & scored ✓" : res.error);
     });
@@ -129,6 +142,34 @@ export function AdminMatchRow({ match, teams }: { match: MatchWithTeams; teams: 
                 <option value={match.home_team_id ?? ""}>{match.home_team?.code}</option>
                 <option value={match.away_team_id ?? ""}>{match.away_team?.code}</option>
               </select>
+            </div>
+          )}
+
+          {isKnockout && home === away && teamsKnown && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="t-sm" style={{ color: "var(--text-2)" }}>
+                Decided in:
+              </span>
+              {(["extra_time", "penalties"] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={`btn ${decided === d ? "btn-primary" : "btn-ghost"}`}
+                  style={{ padding: "6px 12px", fontSize: 13 }}
+                  onClick={() => setDecidedIn(d)}
+                >
+                  {d === "extra_time" ? "Extra time" : "Penalties"}
+                </button>
+              ))}
+              {decided === "penalties" && (
+                <span className="flex items-center" style={{ gap: 8, marginLeft: 4 }}>
+                  <ScoreStepper value={pensHome} onChange={setPensHome} disabled={!teamsKnown} />
+                  <span className="t-sm" style={{ color: "var(--text-3)" }}>
+                    pens
+                  </span>
+                  <ScoreStepper value={pensAway} onChange={setPensAway} disabled={!teamsKnown} />
+                </span>
+              )}
             </div>
           )}
 

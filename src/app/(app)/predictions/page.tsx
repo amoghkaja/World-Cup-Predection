@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getMatches, getMyPredictions, getMySideBets, getMyJokers } from "@/lib/queries";
 import { zonedDayKey, zonedDayLabel } from "@/lib/format";
 import { getViewerTimeZone } from "@/lib/tz";
-import type { MatchWithTeams, Prediction, SideBet } from "@/lib/types";
+import type { MatchWithTeams, Prediction } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { CompactPredictionRow } from "@/components/CompactPredictionRow";
 
@@ -35,11 +35,8 @@ export default async function PredictionsPage({
     getMyJokers(),
   ]);
 
-  // Index side bets by match id for the per-row result chips.
-  const sidesByMatch = new Map<number, SideBet[]>();
-  for (const b of sideBets.values()) {
-    (sidesByMatch.get(b.match_id) ?? sidesByMatch.set(b.match_id, []).get(b.match_id)!).push(b);
-  }
+  // Side bets are already grouped by match id (one list per match).
+  const sidesByMatch = sideBets;
 
   const mine = matches
     .filter((m) => preds.has(m.id))

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import type { MatchWithTeams, Prediction, SideBet, JokerPick } from "@/lib/types";
-import { actualOutcomeForMatch, BTTS_REWARD, BTTS_PENALTY, JOKER_WRONG_PENALTY } from "@/lib/scoring";
-import { isLocked } from "@/lib/format";
+import { actualOutcomeForMatch, BTTS_REWARD, BTTS_PENALTY, KO_SIDE_BET, JOKER_PENALTY_BY_STAGE } from "@/lib/scoring";
+import { isLocked, decidedNote } from "@/lib/format";
 import { Flag } from "@/components/TeamBadge";
 import { Icon } from "@/components/Icon";
 import { PointsBadge } from "@/components/PointsBadge";
@@ -86,7 +86,18 @@ function GambleChip({
 }
 
 function sideLabel(b: SideBet): string {
-  return `BTTS ${b.pick === "yes" ? "Y" : "N"}`;
+  const yn = b.pick === "yes" ? "Y" : "N";
+  if (b.market === "et") return `ET ${yn}`;
+  if (b.market === "pens") return `Pens ${yn}`;
+  return `BTTS ${yn}`;
+}
+
+function sideStakes(b: SideBet): string {
+  if (b.market === "et" || b.market === "pens") {
+    const t = KO_SIDE_BET[b.market][b.pick];
+    return `+${t.win}/${t.miss}`;
+  }
+  return `+${BTTS_REWARD}/${BTTS_PENALTY}`;
 }
 
 export function CompactPredictionRow({
@@ -173,6 +184,7 @@ export function CompactPredictionRow({
             </span>
             <span className="t-xs" style={{ color: "var(--text-3)" }}>
               {match.group_label ? `Group ${match.group_label}` : "Knockout"}
+              {settled && decidedNote(match) ? ` · ${decidedNote(match)}` : ""}
               {!settled && locked ? " · In progress" : ""}
             </span>
             {!settled && !locked && (
@@ -190,7 +202,7 @@ export function CompactPredictionRow({
                   label={sideLabel(b)}
                   pts={b.points_awarded}
                   pending={!b.scored}
-                  stakes={`+${BTTS_REWARD}/${BTTS_PENALTY}`}
+                  stakes={sideStakes(b)}
                 />
               ))}
               {joker && (
@@ -199,7 +211,7 @@ export function CompactPredictionRow({
                   pts={joker.points_awarded}
                   star
                   pending={!joker.scored}
-                  stakes={`×2/${JOKER_WRONG_PENALTY}`}
+                  stakes={`×2/${JOKER_PENALTY_BY_STAGE[match.stage]}`}
                 />
               )}
             </div>
