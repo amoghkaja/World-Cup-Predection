@@ -6,9 +6,10 @@ import {
   featuresLive,
   OUTCOME_POINTS,
   EXACT_BONUS,
-  BTTS_REWARD,
   BTTS_PENALTY,
-  JOKER_WRONG_PENALTY,
+  BTTS_PENALTY_GROUP,
+  KO_SIDE_BET,
+  JOKER_PENALTY_BY_STAGE,
   STREAK_TARGET,
   STREAK_REWARD,
 } from "@/lib/scoring";
@@ -16,10 +17,11 @@ import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 
-// Bumped so EVERY player sees this again — the points system changed (the
-// perfect-day bonus became a "5 in a row" streak) and the splash is a mandatory
-// read (can't be dismissed without stepping through). "What's new" replays it.
-const KEY = "wc_points_change_v3";
+// Bumped so EVERY player sees this again — the knockouts are live with new
+// scoring (who-advances gates the points), new ET/pens side bets, and
+// stage-scaled joker/streak. Mandatory read (can't be dismissed without
+// stepping through). "What's new" replays it.
+const KEY = "wc_points_change_v4";
 
 const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
   weekday: "long",
@@ -94,24 +96,19 @@ type Step = { icon: string; title: string; body: string; content?: ReactNode };
 const STEPS: Step[] = [
   {
     icon: "bolt",
-    title: "Important change to points system — please read",
-    body: "Every match is now scored on TWO things: getting the winner right, and getting the exact score right. The exact score is a bonus on top — and it also counts toward your accuracy, so nailing only the winner is a half-right pick.",
+    title: "Knockouts are here — who goes through is the points",
+    body: "In a knockout the big points go to picking the team that ADVANCES — get the survivor wrong and the match scores 0, even if you nailed the score. The exact-score bonus is judged at 90 minutes; extra time and penalties only decide who goes through (you'll see “a.e.t.” or “won 4-2 on pens”).",
     content: <PointsTable />,
   },
   {
     icon: "dice",
-    title: "New: side bets",
-    body: `On any match you can add one optional gamble — Both Teams To Score, Yes or No. Call it right: +${BTTS_REWARD}. Get it wrong: ${BTTS_PENALTY}. It's separate from your match pick, so only bet when you're sure.`,
-  },
-  {
-    icon: "star",
-    title: "Play your joker",
-    body: `Once a day, stake your joker on one match. If your main pick is right it pays double — if it's wrong, it costs you ${JOKER_WRONG_PENALTY}. Choose your spot wisely.`,
+    title: "New: knockout side bets",
+    body: `Two opt-in long-shots on knockout ties, alongside Both Teams To Score: “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) and “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). You only back YES — skip it if you reckon it ends in 90. (Heads up: a missed BTTS cost ${BTTS_PENALTY_GROUP} in the groups and is ${BTTS_PENALTY} from the Round of 32 on.)`,
   },
   {
     icon: "flame",
-    title: `Build a streak: ${STREAK_TARGET} in a row`,
-    body: `Get the result right on ${STREAK_TARGET} matches in a row — in kickoff order — for a +${STREAK_REWARD} bonus, and again at every ${STREAK_TARGET} after that. One wrong result, or skipping an eligible match, resets your run to zero. (This replaces the old "perfect day" bonus, so it no longer matters what timezone you're in.)`,
+    title: "Joker & streak scale up",
+    body: `The deeper the round, the bigger the stakes. A wrong joker now costs more in the later rounds (down to ${JOKER_PENALTY_BY_STAGE.final} in the final), and a ${STREAK_TARGET}-in-a-row streak pays more the further it runs — +${STREAK_REWARD} in the groups, up to +${STREAK_REWARD * 3} on the final.`,
   },
 ];
 
@@ -150,7 +147,7 @@ export function FeatureSplash() {
   return (
     // Not dismissible: backdrop/Escape won't close it — the only way out is to
     // step through and acknowledge, so the points change can't be skipped.
-    <Modal onClose={() => {}} dismissible={false} label="Important change to points system" maxWidth={420}>
+    <Modal onClose={() => {}} dismissible={false} label="What's new for the knockouts" maxWidth={420}>
       <div className="trirule" style={{ flex: "none" }} />
       <div style={{ padding: "26px 22px 20px", textAlign: "center", overflowY: "auto" }}>
         <div

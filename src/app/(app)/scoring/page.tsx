@@ -7,6 +7,7 @@ import {
   maxPointsForStage,
   BTTS_REWARD,
   BTTS_PENALTY,
+  BTTS_PENALTY_GROUP,
   JOKER_PENALTY_BY_STAGE,
   KO_SIDE_BET,
   STREAK_TARGET,
@@ -459,7 +460,7 @@ export default function ScoringPage() {
           {/* BTTS */}
           <Row
             title="Side bet · both teams to score?"
-            desc="Yes/No on any match. Right: you gain; wrong: you lose points."
+            desc={`Yes/No on any match. Win +${BTTS_REWARD}; a miss cost ${BTTS_PENALTY_GROUP} in the group stage and ${BTTS_PENALTY} from the Round of 32 on.`}
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{BTTS_REWARD}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
@@ -469,21 +470,21 @@ export default function ScoringPage() {
           {/* Extra time (knockouts) */}
           <Row
             title="Side bet · goes to extra time? (knockouts)"
-            desc={`Yes pays +${KO_SIDE_BET.et.yes.win}/${KO_SIDE_BET.et.yes.miss}, No pays +${KO_SIDE_BET.et.no.win}/${KO_SIDE_BET.et.no.miss}. Yes is the rarer call, so it pays more.`}
+            desc={`Back it only if you sense a tight tie — right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}. Think it ends in 90? Just don't bet.`}
           >
-            <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.et.yes.win}</span>
+            <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.et.win}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
-            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{KO_SIDE_BET.et.yes.miss}</span>
+            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{KO_SIDE_BET.et.miss}</span>
           </Row>
 
           {/* Penalties (knockouts) */}
           <Row
             title="Side bet · decided on penalties? (knockouts)"
-            desc={`Yes pays +${KO_SIDE_BET.pens.yes.win}/${KO_SIDE_BET.pens.yes.miss}, No pays +${KO_SIDE_BET.pens.no.win}/${KO_SIDE_BET.pens.no.miss}. A shootout is rare — backing it pays the most.`}
+            desc={`A shootout is rare, so it pays the most — right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}.`}
           >
-            <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.pens.yes.win}</span>
+            <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.pens.win}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
-            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{KO_SIDE_BET.pens.yes.miss}</span>
+            <span style={{ color: "var(--bad)", fontWeight: 800 }}>{KO_SIDE_BET.pens.miss}</span>
           </Row>
 
           {/* Joker */}
