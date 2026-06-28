@@ -86,14 +86,26 @@ export async function recomputeStreaks(admin: Admin): Promise<void> {
   }
   const settledIds = settled.map((m) => m.id);
 
-  // All main picks on those matches: who got each one right.
-  const { data: preds } = await admin
-    .from("predictions")
-    .select("user_id, match_id, points_awarded, scored")
-    .in("match_id", settledIds);
+  // All main picks on those matches: who got each one right. Read in PAGES — an
+  // un-limited Supabase select returns at most 1000 rows, so once the league
+  // passed 1000 settled-match predictions the newest ones were silently dropped
+  // and the rebuild never saw recent correct picks (it broke streaks for everyone).
+  // Page through them all so nothing is missed.
+  type PredRow = { user_id: string; match_id: number; points_awarded: number; scored: boolean };
+  const preds: PredRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data } = await admin
+      .from("predictions")
+      .select("user_id, match_id, points_awarded, scored")
+      .in("match_id", settledIds)
+      .range(from, from + 999);
+    const batch = (data ?? []) as PredRow[];
+    preds.push(...batch);
+    if (batch.length < 1000) break;
+  }
   const correct = new Map<string, Set<number>>(); // user -> set of matchIds they got right
   const picked = new Map<string, Set<number>>(); // user -> set of matchIds they picked (settled)
-  for (const p of preds ?? []) {
+  for (const p of preds) {
     if (!picked.has(p.user_id)) picked.set(p.user_id, new Set());
     picked.get(p.user_id)!.add(p.match_id);
     if (p.scored && p.points_awarded > 0) {
