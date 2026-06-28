@@ -12,6 +12,7 @@ import { Countdown } from "./Countdown";
 import { Segmented } from "./Segmented";
 import { PredictionForm } from "./PredictionForm";
 import { SideBetControls, type SideState } from "./SideBetControls";
+import { MatchPointsInfo } from "./MatchPointsInfo";
 
 /**
  * Slim shapes for the home feed — the dashboard used to serialize full DB rows
@@ -194,7 +195,7 @@ export function MatchRow({
             borderTop: "1px solid var(--line)",
           }}
         >
-          <div className="flex items-center justify-between" style={{ paddingTop: 12 }}>
+          <div className="flex items-center justify-between" style={{ paddingTop: 12, gap: 10 }}>
             <span className="t-xs" style={{ color: "var(--text-3)", fontWeight: 600 }}>
               {open ? (
                 <Countdown kickoff={m.kickoff} variant="labeled" />
@@ -202,14 +203,17 @@ export function MatchRow({
                 "Closed at kickoff"
               )}
             </span>
-            <Link
-              href={`/matches/${m.id}`}
-              className="t-xs inline-flex items-center"
-              style={{ color: "var(--text-2)", fontWeight: 650, gap: 2 }}
-            >
-              Match details
-              <Icon name="chevR" size={13} />
-            </Link>
+            <span className="flex items-center" style={{ gap: 10, flex: "none" }}>
+              <MatchPointsInfo stage={m.stage} />
+              <Link
+                href={`/matches/${m.id}`}
+                className="t-xs inline-flex items-center"
+                style={{ color: "var(--text-2)", fontWeight: 650, gap: 2 }}
+              >
+                Match details
+                <Icon name="chevR" size={13} />
+              </Link>
+            </span>
           </div>
           <PredictionForm
             match={{
