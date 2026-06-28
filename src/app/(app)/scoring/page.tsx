@@ -460,7 +460,7 @@ export default function ScoringPage() {
           {/* BTTS */}
           <Row
             title="Side bet · both teams to score?"
-            desc={`Yes/No on any match. Win +${BTTS_REWARD}; a miss costs ${Math.abs(BTTS_PENALTY_GROUP)} in the group stage and ${Math.abs(BTTS_PENALTY)} from the Round of 32 on.`}
+            desc={`Back YES on a tie you read as open — win +${BTTS_REWARD}; a miss costs ${Math.abs(BTTS_PENALTY)} (${Math.abs(BTTS_PENALTY_GROUP)} in the group stage). One-sided: there's no "no" to bet, just skip it if you expect few goals.`}
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{BTTS_REWARD}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
@@ -489,8 +489,8 @@ export default function ScoringPage() {
 
           {/* Joker */}
           <Row
-            title="Joker · double-down"
-            desc={`One per day. Doubles your match points if the pick is right; if wrong it costs you — a penalty that grows in the later rounds (${JOKER_PENALTY_BY_STAGE.group} early to ${JOKER_PENALTY_BY_STAGE.final} in the final).`}
+            title="Joker · double-or-nothing"
+            desc={`One per day. A right pick counts double; a wrong one costs the full points that round was worth — you risk what you stand to win (${JOKER_PENALTY_BY_STAGE.group} in the groups up to ${JOKER_PENALTY_BY_STAGE.final} in the final). Only play it when you're confident.`}
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>×2</span>
             <span style={{ color: "var(--text-3)" }}> / </span>

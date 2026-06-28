@@ -116,10 +116,16 @@ export function scorePodium(position: number, correct: boolean, revised: boolean
 
 export type SideBetPick = "yes" | "no";
 
-// --- Both teams to score. Win pays +3. The miss penalty is STAGE-SCALED: the
-// group stage keeps the original lighter -2 (those bets were placed under that
-// rule, so we never change them retroactively); knockouts (R32+) use the
-// symmetric -3, which removes the small +EV edge a blind call had at -2.
+// --- Both teams to score (BTTS). Now an OPT-IN, YES-ONLY long-shot, in line
+// with the ET/pens markets below: you only ever back "yes, both teams score" on
+// a tie you read as open. There is deliberately no "no" side any more — a
+// two-sided market here was farmable, because World Cup knockouts are
+// low-scoring (BTTS lands ~40-45% of the time), so a blind "no" was +EV. As a
+// one-sided bet at +3/-3 the break-even sits at 50%, comfortably ABOVE that base
+// rate, so a blind "always yes" is firmly -EV — only a genuine read profits.
+// The miss penalty is STAGE-SCALED: the group stage keeps the original lighter
+// -2 (those bets were placed under the old two-sided rule, so we never change
+// them retroactively); knockouts (R32+) use -3.
 export const BTTS_REWARD = 3;
 export const BTTS_PENALTY = -3; // knockouts (R32+)
 export const BTTS_PENALTY_GROUP = -2; // group stage (grandfathered)
@@ -133,7 +139,11 @@ export function bttsPenaltyFor(stage: MatchStage): number {
   return stage === "group" ? BTTS_PENALTY_GROUP : BTTS_PENALTY;
 }
 
-/** Points for one settled BTTS side bet, from the stored 90' score. */
+/**
+ * Points for one settled BTTS side bet, from the stored 90' score. New bets are
+ * always "yes" (the picker is one-sided); the `pick` parameter is still honoured
+ * so the grandfathered group-stage "no" bets keep their settled scores.
+ */
 export function scoreSideBet(
   pick: SideBetPick,
   home: number,
@@ -186,21 +196,32 @@ export function scoreKoSideBet(market: KoMarket, decidedIn: MatchDecidedIn | nul
   return happened ? t.win : t.miss;
 }
 
-// --- Joker / double-down: doubles a correct main pick (pays its base points
-// again — upside already scales with the bigger knockout points), or costs a
-// stage-scaled penalty when the main pick is wrong. Relies on a wrong main pick
-// scoring exactly 0. JOKER_WRONG_PENALTY is the base/group value, kept as a
-// scalar for generic copy; JOKER_PENALTY_BY_STAGE is authoritative for scoring.
+// --- Joker / double-down: a TRUE double-or-nothing. A correct main pick pays
+// its points again (so the upside scales with the round AND with nailing the
+// exact score); a wrong main pick now costs the FULL points that round was worth
+// — i.e. you risk what you stood to win. The old flat -4..-8 penalty made the
+// joker almost free EV: a small, fixed downside against a big, scaling upside,
+// so it was rational to play it on your best pick every single day (and in the
+// late rounds, where there's often one match per day, the "one per day" cap
+// stopped binding — you'd joker every knockout). Risking the stage MAX makes it
+// a real gamble: a result-only correct pick (the common case) only breaks even
+// when you're well above ~60% confident, and blindly jokering a coin-flip is
+// firmly -EV. The group stage is grandfathered at the old -4 (those rounds are
+// settled — we never rescore them).
+//
+// Knockout penalties = -maxPointsForStage(stage): r32 -6, r16 -8, qf -10,
+// sf -13, third -8, final -15. JOKER_WRONG_PENALTY is the group/base value kept
+// as a scalar for generic copy; JOKER_PENALTY_BY_STAGE is authoritative.
 export const JOKER_WRONG_PENALTY = -4;
 
 export const JOKER_PENALTY_BY_STAGE: Record<MatchStage, number> = {
-  group: -4,
-  r32: -4,
-  r16: -5,
-  qf: -6,
-  sf: -7,
-  third: -5,
-  final: -8,
+  group: -4, // grandfathered (group stage settled under the old penalty)
+  r32: -6,
+  r16: -8,
+  qf: -10,
+  sf: -13,
+  third: -8,
+  final: -15,
 };
 
 export function scoreJoker(mainPoints: number, stage: MatchStage): number {

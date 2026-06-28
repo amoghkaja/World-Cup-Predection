@@ -11,17 +11,18 @@ export type SideState = Partial<Record<SideBetMarket, "yes" | "no">>;
 
 type Pick = "yes" | "no" | null;
 
-const KO_QUESTION: Record<"et" | "pens", string> = {
+const QUESTION: Record<SideBetMarket, string> = {
+  btts: "Both teams to score?",
   et: "Goes to extra time?",
   pens: "Decided on penalties?",
 };
 
 /**
- * Opt-in gambles for a single match plus the once-per-day joker. Every match
- * offers Both-teams-to-score (a Yes/No call). Knockouts add two YES-only
- * long-shots — "goes to extra time?" and "decided on penalties?" — that you back
- * when you sense a tight tie. Shown only for eligible, still-open matches; writes
- * go through RPC-backed server actions.
+ * Opt-in gambles for a single match plus the once-per-day joker. Every market is
+ * a YES-only long-shot you back when you sense it: "both teams to score?" on any
+ * match, plus "goes to extra time?" and "decided on penalties?" in knockouts.
+ * There's no "no" side to farm — skip the bet if you don't fancy it. Shown only
+ * for eligible, still-open matches; writes go through RPC-backed server actions.
  */
 export function SideBetControls({
   matchId,
@@ -99,27 +100,17 @@ export function SideBetControls({
     );
   }
 
-  const seg = (active: boolean): React.CSSProperties => ({
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 9,
-    border: "none",
-    fontWeight: 700,
-    fontSize: 13.5,
-    cursor: !live ? "not-allowed" : pending ? "wait" : "pointer",
-    opacity: !live ? 0.55 : 1,
-    background: active ? "var(--brand)" : "transparent",
-    color: active ? "var(--on-brand)" : "var(--text-2)",
-  });
-  const segWrap: React.CSSProperties = {
-    display: "flex",
-    gap: 4,
-    width: 132,
-    background: "var(--surface-2)",
-    border: "1px solid var(--line)",
-    borderRadius: 12,
-    padding: 4,
-  };
+  // Every side bet is now a single YES-only toggle: tap to back it, tap again to
+  // drop it. BTTS (any match) + the knockout-only ET/pens long-shots.
+  const markets: { market: SideBetMarket; win: number; miss: number }[] = [
+    { market: "btts", win: BTTS_REWARD, miss: bttsMiss },
+    ...(isKnockout
+      ? [
+          { market: "et" as const, win: KO_SIDE_BET.et.win, miss: KO_SIDE_BET.et.miss },
+          { market: "pens" as const, win: KO_SIDE_BET.pens.win, miss: KO_SIDE_BET.pens.miss },
+        ]
+      : []),
+  ];
 
   return (
     <div className="flex flex-col" style={{ gap: 12, paddingTop: 4 }}>
@@ -157,90 +148,49 @@ export function SideBetControls({
         </button>
       </div>
 
-      {/* BTTS — a Yes/No call on every match */}
-      <div className="flex items-center" style={{ gap: 10 }}>
-        <span className="t-sm" style={{ flex: 1, fontWeight: 600 }}>
-          Both teams to score?
-          <span className="t-xs tnum" style={{ display: "block", color: "var(--text-3)" }}>
-            win +{BTTS_REWARD} · miss {bttsMiss}
-          </span>
-        </span>
-        <div style={segWrap}>
-          <button type="button" disabled={frozen} style={seg(picks.btts === "yes")} onClick={() => pick("btts", "yes")}>
-            Yes
-          </button>
-          <button type="button" disabled={frozen} style={seg(picks.btts === "no")} onClick={() => pick("btts", "no")}>
-            No
-          </button>
-        </div>
-        <button
-          type="button"
-          aria-label="Remove both-teams-to-score bet"
-          title="Remove bet"
-          disabled={frozen}
-          onClick={() => clear("btts")}
-          className="grid place-items-center press"
-          style={{
-            width: 40,
-            height: 40,
-            flex: "none",
-            borderRadius: 999,
-            border: "1px solid var(--line)",
-            background: "var(--surface)",
-            color: "var(--text-3)",
-            visibility: picks.btts === null ? "hidden" : "visible",
-            cursor: frozen ? "not-allowed" : "pointer",
-          }}
-        >
-          <Icon name="x" size={14} sw={2.4} />
-        </button>
-      </div>
-
-      {/* Knockout long-shots — back YES only (tap to bet / tap again to drop) */}
-      {isKnockout &&
-        (["et", "pens"] as const).map((market) => {
-          const on = picks[market] === "yes";
-          const t = KO_SIDE_BET[market];
-          return (
-            <div key={market} className="flex items-center" style={{ gap: 10 }}>
-              <span className="t-sm" style={{ flex: 1, fontWeight: 600 }}>
-                {KO_QUESTION[market]}
-                <span className="t-xs tnum" style={{ display: "block", color: "var(--text-3)" }}>
-                  right +{t.win} · wrong {t.miss}
-                </span>
+      {/* Side bets — each a YES-only long-shot (tap to bet / tap again to drop) */}
+      {markets.map(({ market, win, miss }) => {
+        const on = picks[market] === "yes";
+        return (
+          <div key={market} className="flex items-center" style={{ gap: 10 }}>
+            <span className="t-sm" style={{ flex: 1, fontWeight: 600 }}>
+              {QUESTION[market]}
+              <span className="t-xs tnum" style={{ display: "block", color: "var(--text-3)" }}>
+                right +{win} · wrong {miss}
               </span>
-              <button
-                type="button"
-                disabled={frozen}
-                onClick={() => (on ? clear(market) : pick(market, "yes"))}
-                className="press inline-flex items-center justify-center"
-                style={{
-                  minWidth: 96,
-                  minHeight: 40,
-                  padding: "0 14px",
-                  gap: 6,
-                  borderRadius: 12,
-                  border: `1px solid ${on ? "var(--brand)" : "var(--line)"}`,
-                  background: on ? "var(--brand)" : "var(--surface)",
-                  color: on ? "var(--on-brand)" : "var(--text-2)",
-                  fontWeight: 700,
-                  fontSize: 13.5,
-                  cursor: !live ? "not-allowed" : pending ? "wait" : "pointer",
-                  opacity: !live ? 0.55 : 1,
-                }}
-              >
-                {on ? (
-                  <>
-                    <Icon name="check" size={14} sw={2.6} />
-                    Betting yes
-                  </>
-                ) : (
-                  "Bet yes"
-                )}
-              </button>
-            </div>
-          );
-        })}
+            </span>
+            <button
+              type="button"
+              disabled={frozen}
+              onClick={() => (on ? clear(market) : pick(market, "yes"))}
+              className="press inline-flex items-center justify-center"
+              style={{
+                minWidth: 96,
+                minHeight: 40,
+                padding: "0 14px",
+                gap: 6,
+                borderRadius: 12,
+                border: `1px solid ${on ? "var(--brand)" : "var(--line)"}`,
+                background: on ? "var(--brand)" : "var(--surface)",
+                color: on ? "var(--on-brand)" : "var(--text-2)",
+                fontWeight: 700,
+                fontSize: 13.5,
+                cursor: !live ? "not-allowed" : pending ? "wait" : "pointer",
+                opacity: !live ? 0.55 : 1,
+              }}
+            >
+              {on ? (
+                <>
+                  <Icon name="check" size={14} sw={2.6} />
+                  Betting yes
+                </>
+              ) : (
+                "Bet yes"
+              )}
+            </button>
+          </div>
+        );
+      })}
 
       {/* Joker */}
       <button
@@ -307,7 +257,7 @@ export function SideBetControls({
             </p>
             <div className="flex flex-col gap-2">
               {[
-                ["Both teams to score", `A yes/no call — win +${BTTS_REWARD}, a miss costs ${Math.abs(bttsMiss)}.`],
+                ["Both teams to score", `Back YES on a tie you read as open — win +${BTTS_REWARD}, a miss costs ${Math.abs(bttsMiss)}. There's no "no" side: just skip it if you expect a tight game.`],
                 ...(isKnockout
                   ? ([
                       [
