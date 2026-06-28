@@ -18,11 +18,12 @@ const QUESTION: Record<SideBetMarket, string> = {
 };
 
 /**
- * Opt-in gambles for a single match plus the once-per-day joker. Every market is
- * a YES-only long-shot you back when you sense it: "both teams to score?" on any
- * match, plus "goes to extra time?" and "decided on penalties?" in knockouts.
- * There's no "no" side to farm — skip the bet if you don't fancy it. Shown only
- * for eligible, still-open matches; writes go through RPC-backed server actions.
+ * Opt-in gambles for a single match plus the once-per-day joker. "Both teams to
+ * score?" is a two-sided Yes/No call on any match. Knockouts add the dramatic-
+ * ending market — "goes to extra time?" and "decided on penalties?" — which are
+ * MUTUALLY EXCLUSIVE yes-only long-shots: you back at most one (a shootout is
+ * also extra time, so betting both makes no sense). Shown only for eligible,
+ * still-open matches; writes go through RPC-backed server actions.
  */
 export function SideBetControls({
   matchId,
@@ -90,6 +91,23 @@ export function SideBetControls({
       () => setPicks((p) => ({ ...p, [market]: prev }))
     );
   }
+  // ET / pens are mutually exclusive — backing one drops the other (a single
+  // call on how the tie ends). Tap an active one to drop it. The server action
+  // also clears the opposite market, so this stays consistent even on a refresh.
+  function pickKo(market: "et" | "pens") {
+    if (!live) return;
+    if (picks[market] === "yes") {
+      clear(market);
+      return;
+    }
+    const other = market === "et" ? "pens" : "et";
+    const prev = { ...picks };
+    setPicks((p) => ({ ...p, [market]: "yes", [other]: null }));
+    run(
+      () => saveSideBet({ matchId, market, pick: "yes" }),
+      () => setPicks(prev)
+    );
+  }
   function toggleJoker() {
     if (!live || (jokerUsedElsewhere && !jok)) return;
     const prev = jok;
@@ -100,17 +118,36 @@ export function SideBetControls({
     );
   }
 
-  // Every side bet is now a single YES-only toggle: tap to back it, tap again to
-  // drop it. BTTS (any match) + the knockout-only ET/pens long-shots.
-  const markets: { market: SideBetMarket; win: number; miss: number }[] = [
-    { market: "btts", win: BTTS_REWARD, miss: bttsMiss },
-    ...(isKnockout
-      ? [
-          { market: "et" as const, win: KO_SIDE_BET.et.win, miss: KO_SIDE_BET.et.miss },
-          { market: "pens" as const, win: KO_SIDE_BET.pens.win, miss: KO_SIDE_BET.pens.miss },
-        ]
-      : []),
-  ];
+  // BTTS is a two-sided Yes/No segmented control.
+  const seg = (active: boolean): React.CSSProperties => ({
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 9,
+    border: "none",
+    fontWeight: 700,
+    fontSize: 13.5,
+    cursor: !live ? "not-allowed" : pending ? "wait" : "pointer",
+    opacity: !live ? 0.55 : 1,
+    background: active ? "var(--brand)" : "transparent",
+    color: active ? "var(--on-brand)" : "var(--text-2)",
+  });
+  const segWrap: React.CSSProperties = {
+    display: "flex",
+    gap: 4,
+    width: 132,
+    background: "var(--surface-2)",
+    border: "1px solid var(--line)",
+    borderRadius: 12,
+    padding: 4,
+  };
+
+  // The knockout "how it ends" long-shots — mutually exclusive, yes-only.
+  const koMarkets: { market: "et" | "pens"; win: number; miss: number }[] = isKnockout
+    ? [
+        { market: "et", win: KO_SIDE_BET.et.win, miss: KO_SIDE_BET.et.miss },
+        { market: "pens", win: KO_SIDE_BET.pens.win, miss: KO_SIDE_BET.pens.miss },
+      ]
+    : [];
 
   return (
     <div className="flex flex-col" style={{ gap: 12, paddingTop: 4 }}>
@@ -148,8 +185,52 @@ export function SideBetControls({
         </button>
       </div>
 
-      {/* Side bets — each a YES-only long-shot (tap to bet / tap again to drop) */}
-      {markets.map(({ market, win, miss }) => {
+      {/* BTTS — a two-sided Yes/No call on every match */}
+      <div className="flex items-center" style={{ gap: 10 }}>
+        <span className="t-sm" style={{ flex: 1, fontWeight: 600 }}>
+          {QUESTION.btts}
+          <span className="t-xs tnum" style={{ display: "block", color: "var(--text-3)" }}>
+            win +{BTTS_REWARD} · miss {bttsMiss}
+          </span>
+        </span>
+        <div style={segWrap}>
+          <button type="button" disabled={frozen} style={seg(picks.btts === "yes")} onClick={() => pick("btts", "yes")}>
+            Yes
+          </button>
+          <button type="button" disabled={frozen} style={seg(picks.btts === "no")} onClick={() => pick("btts", "no")}>
+            No
+          </button>
+        </div>
+        <button
+          type="button"
+          aria-label="Remove both-teams-to-score bet"
+          title="Remove bet"
+          disabled={frozen}
+          onClick={() => clear("btts")}
+          className="grid place-items-center press"
+          style={{
+            width: 40,
+            height: 40,
+            flex: "none",
+            borderRadius: 999,
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
+            color: "var(--text-3)",
+            visibility: picks.btts === null ? "hidden" : "visible",
+            cursor: frozen ? "not-allowed" : "pointer",
+          }}
+        >
+          <Icon name="x" size={14} sw={2.4} />
+        </button>
+      </div>
+
+      {/* Knockout "how it ends" — mutually exclusive, back YES on at most one */}
+      {koMarkets.length > 0 && (
+        <div className="t-xs" style={{ color: "var(--text-3)", marginTop: -4 }}>
+          How it ends · back one (a shootout counts as extra time too)
+        </div>
+      )}
+      {koMarkets.map(({ market, win, miss }) => {
         const on = picks[market] === "yes";
         return (
           <div key={market} className="flex items-center" style={{ gap: 10 }}>
@@ -162,7 +243,7 @@ export function SideBetControls({
             <button
               type="button"
               disabled={frozen}
-              onClick={() => (on ? clear(market) : pick(market, "yes"))}
+              onClick={() => pickKo(market)}
               className="press inline-flex items-center justify-center"
               style={{
                 minWidth: 96,
@@ -257,16 +338,12 @@ export function SideBetControls({
             </p>
             <div className="flex flex-col gap-2">
               {[
-                ["Both teams to score", `Back YES on a tie you read as open — win +${BTTS_REWARD}, a miss costs ${Math.abs(bttsMiss)}. There's no "no" side: just skip it if you expect a tight game.`],
+                ["Both teams to score", `A Yes/No call on any match — win +${BTTS_REWARD}, a miss costs ${Math.abs(bttsMiss)}.`],
                 ...(isKnockout
                   ? ([
                       [
-                        "Goes to extra time?",
-                        `A long-shot you back when you sense a tight tie — right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}. Don't bet it if you think it'll be settled in 90.`,
-                      ],
-                      [
-                        "Decided on penalties?",
-                        `Rarer still, so it pays more — right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}.`,
+                        "How the tie ends (extra time or pens)",
+                        `Two long-shots you back when you sense a tight tie — extra time (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) or penalties (rarer, so it pays more: right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). Pick at most ONE — a shootout is also extra time. Skip both if you think it ends in 90.`,
                       ],
                     ] as [string, string][])
                   : []),

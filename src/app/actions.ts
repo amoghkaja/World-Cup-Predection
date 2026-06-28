@@ -144,12 +144,6 @@ export async function saveSideBet(input: {
     if ((input.market === "et" || input.market === "pens") && match.stage === "group") {
       return { ok: false, error: "That bet is knockouts only." };
     }
-    // BTTS is now a yes-only long-shot — there's no two-sided "no" to farm.
-    // (Group-stage "no" bets pre-date this rule and keep their settled scores;
-    // the group stage is over, so no new "no" can be placed anyway.)
-    if (input.market === "btts" && input.pick === "no") {
-      return { ok: false, error: "Both teams to score is a yes-only bet now." };
-    }
 
     const { error } = await supabase.rpc("save_side_bet", {
       p_match_id: input.matchId,
@@ -161,6 +155,13 @@ export async function saveSideBet(input: {
         return { ok: false, error: "This match is locked — the deadline has passed." };
       }
       return { ok: false, error: error.message };
+    }
+
+    // ET and penalties are mutually exclusive — a shootout is also extra time, so
+    // you only ever back one. Once this one is saved, drop the opposite.
+    if (input.market === "et" || input.market === "pens") {
+      const other = input.market === "et" ? "pens" : "et";
+      await supabase.rpc("clear_side_bet", { p_match_id: input.matchId, p_market: other });
     }
 
     revalidatePath("/dashboard");
