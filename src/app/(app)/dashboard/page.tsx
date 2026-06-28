@@ -161,7 +161,12 @@ export default async function DashboardPage() {
       {/* header: title + stat strip */}
       <div className="flex flex-wrap items-center justify-between" style={{ gap: 12 }}>
         <h1 className="t-h1">Matches</h1>
-        <div className="card flex" style={{ padding: "8px 2px" }}>
+        <Link
+          href="/profile"
+          className="card lift flex"
+          style={{ padding: "8px 2px" }}
+          aria-label="Your standing and full points breakdown"
+        >
           {stats.map((s, i) => (
             <div
               key={s.label}
@@ -187,7 +192,7 @@ export default async function DashboardPage() {
               </div>
             </div>
           ))}
-        </div>
+        </Link>
       </div>
 
       <StreakTracker streak={streak} />
