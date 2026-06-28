@@ -288,6 +288,58 @@ export const getMyJokers = cache(
 );
 
 /**
+ * Per-source points breakdown for the signed-in user — every bucket that feeds
+ * the leaderboard total, so "where did my points come from?" is answerable on
+ * the player's own surfaces. The seven buckets sum to leaderboard.total_points
+ * (perfect-days was retired in migration 0012, so there's no eighth source).
+ * Request-scoped only — never cache across users.
+ */
+export type MyPointsBreakdown = {
+  matchPts: number;
+  groupPts: number;
+  podiumPts: number;
+  goldenBootPts: number;
+  sidePts: number;
+  jokerPts: number;
+  streakPts: number;
+};
+
+export const getMyPointsBreakdown = cache(async (): Promise<MyPointsBreakdown> => {
+  const zero: MyPointsBreakdown = {
+    matchPts: 0,
+    groupPts: 0,
+    podiumPts: 0,
+    goldenBootPts: 0,
+    sidePts: 0,
+    jokerPts: 0,
+    streakPts: 0,
+  };
+  const user = await getCurrentUser();
+  if (!user) return zero;
+  const supabase = await createClient();
+  const [preds, groups, podium, tourn, sides, jokers, streaks] = await Promise.all([
+    supabase.from("predictions").select("points_awarded").eq("user_id", user.id),
+    supabase.from("group_predictions").select("points_awarded").eq("user_id", user.id),
+    supabase.from("podium_predictions").select("points_awarded").eq("user_id", user.id),
+    supabase.from("tournament_predictions").select("points_awarded").eq("user_id", user.id),
+    supabase.from("side_bets").select("points_awarded").eq("user_id", user.id).eq("scored", true),
+    supabase.from("joker_picks").select("points_awarded").eq("user_id", user.id).eq("scored", true),
+    supabase.from("streak_bonuses").select("points_awarded").eq("user_id", user.id),
+  ]);
+  const sum = (rows: { points_awarded: number }[] | null) =>
+    (rows ?? []).reduce((s, r) => s + (r.points_awarded ?? 0), 0);
+  return {
+    matchPts: sum(preds.data),
+    groupPts: sum(groups.data),
+    podiumPts: sum(podium.data),
+    goldenBootPts: sum(tourn.data),
+    sidePts: sum(sides.data),
+    jokerPts: sum(jokers.data),
+    streakPts: sum(streaks.data),
+  };
+});
+
+/**
  * Current streak for the badge. The run is "alive" only if the user extended it
  * on the MOST RECENT settled eligible match — a miss or a skip writes no
  * streak_bonuses row for that match, so the streak is 0 even though earlier

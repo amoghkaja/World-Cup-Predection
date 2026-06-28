@@ -1,15 +1,27 @@
 import Link from "next/link";
-import { getLeaderboard, getProfile, getBoardView, applyNoGambleView } from "@/lib/queries";
+import {
+  getLeaderboard,
+  getProfile,
+  getBoardView,
+  applyNoGambleView,
+  getMyPointsBreakdown,
+} from "@/lib/queries";
 import { accuracyPct } from "@/lib/scoring";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { AvatarToggle } from "@/components/AvatarToggle";
+import { PointsBreakdown } from "@/components/PointsBreakdown";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const [profile, real, view] = await Promise.all([getProfile(), getLeaderboard(), getBoardView()]);
+  const [profile, real, view, breakdown] = await Promise.all([
+    getProfile(),
+    getLeaderboard(),
+    getBoardView(),
+    getMyPointsBreakdown(),
+  ]);
 
   const norisk = view === "norisk";
   const board = norisk ? applyNoGambleView(real) : real;
@@ -87,6 +99,9 @@ export default async function ProfilePage() {
           </div>
         ))}
       </div>
+
+      {/* points split — total points is only the headline; show the sources */}
+      <PointsBreakdown data={breakdown} norisk={norisk} />
 
       {/* nav links */}
       <div className="card mb-[18px]" style={{ overflow: "hidden" }}>

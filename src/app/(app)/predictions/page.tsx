@@ -1,10 +1,18 @@
 import Link from "next/link";
-import { getMatches, getMyPredictions, getMySideBets, getMyJokers } from "@/lib/queries";
+import {
+  getMatches,
+  getMyPredictions,
+  getMySideBets,
+  getMyJokers,
+  getMyPointsBreakdown,
+  getBoardView,
+} from "@/lib/queries";
 import { zonedDayKey, zonedDayLabel } from "@/lib/format";
 import { getViewerTimeZone } from "@/lib/tz";
 import type { MatchWithTeams, Prediction } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { CompactPredictionRow } from "@/components/CompactPredictionRow";
+import { PointsBreakdown } from "@/components/PointsBreakdown";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +35,16 @@ export default async function PredictionsPage({
   const { tab: tabParam } = await searchParams;
   const tab: Tab = tabParam === "settled" || tabParam === "pending" ? tabParam : "all";
 
-  const [matches, preds, tz, sideBets, jokers] = await Promise.all([
+  const [matches, preds, tz, sideBets, jokers, breakdown, view] = await Promise.all([
     getMatches(),
     getMyPredictions(),
     getViewerTimeZone(),
     getMySideBets(),
     getMyJokers(),
+    getMyPointsBreakdown(),
+    getBoardView(),
   ]);
+  const norisk = view === "norisk";
 
   // Side bets are already grouped by match id (one list per match).
   const sidesByMatch = sideBets;
@@ -63,7 +74,7 @@ export default async function PredictionsPage({
   const days = [...dayMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
   const summary: { label: string; value: string | number; icon: string; gold?: boolean }[] = [
-    { label: "Points banked", value: earned, icon: "bolt", gold: true },
+    { label: "Match points", value: earned, icon: "bolt", gold: true },
     { label: "Correct results", value: `${hits}/${settled.length}`, icon: "target" },
     { label: "Pending picks", value: pendingCount, icon: "clock" },
   ];
@@ -102,6 +113,9 @@ export default async function PredictionsPage({
           </div>
         ))}
       </div>
+
+      {/* full points split — match picks are only one of several sources */}
+      <PointsBreakdown data={breakdown} norisk={norisk} title="Where all your points come from" />
 
       {/* filter (server-rendered segmented via query param) */}
       <div className="seg mb-4 self-start">
