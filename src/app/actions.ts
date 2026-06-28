@@ -144,6 +144,12 @@ export async function saveSideBet(input: {
     if ((input.market === "et" || input.market === "pens") && match.stage === "group") {
       return { ok: false, error: "That bet is knockouts only." };
     }
+    // BTTS is now a yes-only long-shot — there's no two-sided "no" to farm.
+    // (Group-stage "no" bets pre-date this rule and keep their settled scores;
+    // the group stage is over, so no new "no" can be placed anyway.)
+    if (input.market === "btts" && input.pick === "no") {
+      return { ok: false, error: "Both teams to score is a yes-only bet now." };
+    }
 
     const { error } = await supabase.rpc("save_side_bet", {
       p_match_id: input.matchId,
@@ -452,14 +458,19 @@ export async function saveMatchResult(input: {
         }
         winner = input.winnerTeamId;
       }
-      // How the tie was decided: default to regular when decisive at 90', penalties
-      // when level (the admin can override to extra_time).
-      decidedIn = input.decidedIn ?? (home === away ? "penalties" : "regular");
-      if (decidedIn !== "regular" && decidedIn !== "extra_time" && decidedIn !== "penalties") {
-        return { ok: false, error: "Invalid 'decided in' value." };
-      }
-      if (home === away && decidedIn === "regular") {
-        return { ok: false, error: "A level knockout must be decided in extra time or penalties." };
+      // How the tie was decided. A decisive 90' score is ALWAYS regular time. A
+      // level 90' MUST be extra time or penalties and the caller has to say
+      // which — we never silently guess "penalties", which would wrongly settle
+      // the pens side bet for a tie actually won in extra time.
+      if (home !== away) {
+        decidedIn = "regular";
+      } else if (input.decidedIn === "extra_time" || input.decidedIn === "penalties") {
+        decidedIn = input.decidedIn;
+      } else {
+        return {
+          ok: false,
+          error: "A level knockout must be decided in extra time or on penalties — say which.",
+        };
       }
       const opt = (v: number | null | undefined): number | null =>
         v == null ? null : isIntIn(v, 0, 40) ? v : NaN;

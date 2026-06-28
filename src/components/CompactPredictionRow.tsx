@@ -88,7 +88,8 @@ function GambleChip({
 function sideLabel(b: SideBet): string {
   if (b.market === "et") return "To ET";
   if (b.market === "pens") return "Pens";
-  return `BTTS ${b.pick === "yes" ? "Y" : "N"}`;
+  // BTTS is yes-only now; legacy group "no" bets still render distinctly.
+  return b.pick === "yes" ? "BTTS" : "BTTS no";
 }
 
 function sideStakes(b: SideBet, stage: MatchStage): string {

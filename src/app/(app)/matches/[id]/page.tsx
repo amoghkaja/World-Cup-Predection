@@ -249,8 +249,12 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         </div>
         <div className="flex flex-col" style={{ gap: 8 }}>
           {[
-            ["Correct result (Home / Draw / Away)", `${base} pts`],
-            ["Exact score bonus", `+${exact} pts`],
+            match.stage === "group"
+              ? ["Correct result (Home / Draw / Away)", `${base} pts`]
+              : ["Correct team to advance", `${base} pts`],
+            match.stage === "group"
+              ? ["Exact score bonus", `+${exact} pts`]
+              : ["Exact 90' score bonus", `+${exact} pts`],
           ].map(([l, r]) => (
             <div
               key={l}

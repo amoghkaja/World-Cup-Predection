@@ -6,8 +6,8 @@ import {
   featuresLive,
   OUTCOME_POINTS,
   EXACT_BONUS,
+  BTTS_REWARD,
   BTTS_PENALTY,
-  BTTS_PENALTY_GROUP,
   KO_SIDE_BET,
   JOKER_PENALTY_BY_STAGE,
   STREAK_TARGET,
@@ -102,13 +102,13 @@ const STEPS: Step[] = [
   },
   {
     icon: "dice",
-    title: "New: knockout side bets",
-    body: `Two opt-in long-shots on knockout ties, alongside Both Teams To Score: “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) and “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). You only back YES — skip it if you reckon it ends in 90. (Heads up: a missed BTTS costs ${Math.abs(BTTS_PENALTY_GROUP)} in the groups, ${Math.abs(BTTS_PENALTY)} from the Round of 32 on.)`,
+    title: "New: side bets are one-sided long-shots",
+    body: `Every side bet is now something you only back YES — there's no "no" side to farm. Both Teams To Score on any tie (win +${BTTS_REWARD}, a miss costs ${Math.abs(BTTS_PENALTY)}), plus two knockout-only calls: “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) and “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). Skip the bet if you reckon it won't happen.`,
   },
   {
     icon: "flame",
-    title: "Joker & streak scale up",
-    body: `The deeper the round, the bigger the stakes. A wrong joker now costs more in the later rounds (down to ${JOKER_PENALTY_BY_STAGE.final} in the final), and a ${STREAK_TARGET}-in-a-row streak pays more the further it runs — +${STREAK_REWARD} in the groups, up to +${STREAK_REWARD * 3} on the final.`,
+    title: "Joker is a real double-or-nothing",
+    body: `The joker now risks what it pays: a right pick counts double, but a wrong one costs the full points that round was worth — down to ${JOKER_PENALTY_BY_STAGE.final} in the final. Only play it when you're sure. A ${STREAK_TARGET}-in-a-row streak still pays more the further it runs — +${STREAK_REWARD} in the groups, up to +${STREAK_REWARD * 3} on the final.`,
   },
 ];
 
