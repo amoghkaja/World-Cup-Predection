@@ -17,12 +17,12 @@ import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 
-// Bumped so EVERY player sees this again — the knockout rules changed: side
-// bets are now one-sided YES-only long-shots (BTTS included), and the joker is
-// a true double-or-nothing (a wrong pick costs the full points that round was
-// worth). Mandatory read (can't be dismissed without stepping through).
-// "What's new" replays it.
-const KEY = "wc_points_change_v5";
+// Bumped so EVERY player sees this again — the joker is a true double-or-nothing
+// (a wrong pick costs the full points that round was worth), Both Teams To Score
+// is a two-sided Yes/No call, and the knockout extra-time / penalties bets are
+// mutually exclusive (back one, not both). Mandatory read (can't be dismissed
+// without stepping through). "What's new" replays it.
+const KEY = "wc_points_change_v6";
 
 const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
   weekday: "long",
@@ -103,8 +103,8 @@ const STEPS: Step[] = [
   },
   {
     icon: "dice",
-    title: "New: side bets are one-sided long-shots",
-    body: `Every side bet is now something you only back YES — there's no "no" side to farm. Both Teams To Score on any tie (win +${BTTS_REWARD}, a miss costs ${Math.abs(BTTS_PENALTY)}), plus two knockout-only calls: “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) and “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). Skip the bet if you reckon it won't happen.`,
+    title: "Side bets on every tie",
+    body: `Both Teams To Score is a Yes/No call on any match (win +${BTTS_REWARD}, a miss costs ${Math.abs(BTTS_PENALTY)}). Knockouts add a “how it ends” long-shot — back “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) OR “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}), but not both (a shootout is also extra time). Skip it if you reckon it ends in 90.`,
   },
   {
     icon: "flame",

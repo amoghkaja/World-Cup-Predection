@@ -116,16 +116,13 @@ export function scorePodium(position: number, correct: boolean, revised: boolean
 
 export type SideBetPick = "yes" | "no";
 
-// --- Both teams to score (BTTS). Now an OPT-IN, YES-ONLY long-shot, in line
-// with the ET/pens markets below: you only ever back "yes, both teams score" on
-// a tie you read as open. There is deliberately no "no" side any more — a
-// two-sided market here was farmable, because World Cup knockouts are
-// low-scoring (BTTS lands ~40-45% of the time), so a blind "no" was +EV. As a
-// one-sided bet at +3/-3 the break-even sits at 50%, comfortably ABOVE that base
-// rate, so a blind "always yes" is firmly -EV — only a genuine read profits.
-// The miss penalty is STAGE-SCALED: the group stage keeps the original lighter
-// -2 (those bets were placed under the old two-sided rule, so we never change
-// them retroactively); knockouts (R32+) use -3.
+// --- Both teams to score (BTTS): a two-sided Yes/No call. Win pays +3; the miss
+// penalty is STAGE-SCALED — the group stage keeps the lighter -2 (those bets
+// were placed under that rule, so we never change them retroactively), knockouts
+// (R32+) use the symmetric -3. Heads up: WC knockouts are low-scoring (BTTS
+// lands ~40-45%), so at the symmetric price a disciplined "no" carries a small
+// edge — left in deliberately as a readable, two-sided market (it can be made
+// odds-weighted per side later if it needs tightening).
 export const BTTS_REWARD = 3;
 export const BTTS_PENALTY = -3; // knockouts (R32+)
 export const BTTS_PENALTY_GROUP = -2; // group stage (grandfathered)
@@ -139,11 +136,7 @@ export function bttsPenaltyFor(stage: MatchStage): number {
   return stage === "group" ? BTTS_PENALTY_GROUP : BTTS_PENALTY;
 }
 
-/**
- * Points for one settled BTTS side bet, from the stored 90' score. New bets are
- * always "yes" (the picker is one-sided); the `pick` parameter is still honoured
- * so the grandfathered group-stage "no" bets keep their settled scores.
- */
+/** Points for one settled BTTS side bet (Yes/No), from the stored 90' score. */
 export function scoreSideBet(
   pick: SideBetPick,
   home: number,
