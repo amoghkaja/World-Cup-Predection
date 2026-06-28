@@ -17,11 +17,12 @@ import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 
-// Bumped so EVERY player sees this again — the knockouts are live with new
-// scoring (who-advances gates the points), new ET/pens side bets, and
-// stage-scaled joker/streak. Mandatory read (can't be dismissed without
-// stepping through). "What's new" replays it.
-const KEY = "wc_points_change_v4";
+// Bumped so EVERY player sees this again — the knockout rules changed: side
+// bets are now one-sided YES-only long-shots (BTTS included), and the joker is
+// a true double-or-nothing (a wrong pick costs the full points that round was
+// worth). Mandatory read (can't be dismissed without stepping through).
+// "What's new" replays it.
+const KEY = "wc_points_change_v5";
 
 const UNLOCK_LABEL = new Date(FEATURE_CUTOFF_ISO).toLocaleString(undefined, {
   weekday: "long",
