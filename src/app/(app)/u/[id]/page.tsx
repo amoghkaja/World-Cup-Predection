@@ -8,6 +8,7 @@ import {
   podiumWindows,
   getBoardView,
   applyNoGambleView,
+  type MyPointsBreakdown,
 } from "@/lib/queries";
 import type {
   GroupPrediction,
@@ -25,6 +26,7 @@ import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/TeamBadge";
 import { CompactPredictionRow } from "@/components/CompactPredictionRow";
+import { PointsBreakdown } from "@/components/PointsBreakdown";
 
 export const dynamic = "force-dynamic";
 
@@ -129,17 +131,17 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const jokerPts = sum(jokers.filter((j) => j.scored), (j) => j.points_awarded);
   const streakPts = sum(((streakRows ?? []) as { points_awarded: number }[]), (s) => s.points_awarded);
 
-  const breakdown: { label: string; pts: number; hint?: string; gamble?: boolean }[] = [
-    { label: "Match picks", pts: mainPts },
-    { label: "Group stage", pts: groupPts },
-    { label: "Golden Boot", pts: tournPts },
-    { label: "Podium", pts: podiumPts },
-    { label: "Side bets", pts: sidePts, hint: "both-teams-to-score", gamble: true },
-    { label: "Joker", pts: jokerPts, hint: "doubled a pick", gamble: true },
-    { label: "Streak bonus", pts: streakPts, hint: "5 correct in a row" },
-    // In the no-gambles view, drop the gamble rows so the breakdown still sums
-    // to the adjusted total shown above.
-  ].filter((r) => r.pts !== 0 && !(norisk && r.gamble));
+  // In the no-gambles view, PointsBreakdown drops the gamble rows so the split
+  // still sums to the adjusted total shown above.
+  const breakdownData: MyPointsBreakdown = {
+    matchPts: mainPts,
+    groupPts,
+    podiumPts,
+    goldenBootPts: tournPts,
+    sidePts,
+    jokerPts,
+    streakPts,
+  };
 
   const firstName = (profile.display_name ?? "this player").split(" ")[0];
 
@@ -172,46 +174,11 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
         </div>
       </div>
 
-      {breakdown.length > 0 && (
-        <>
-          <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
-            How the {points} points add up
-          </div>
-          <div className="card mb-4" style={{ overflow: "hidden" }}>
-            {breakdown.map((r, i) => (
-              <div
-                key={r.label}
-                className="flex items-center gap-3"
-                style={{
-                  padding: "10px 16px",
-                  borderBottom: i === breakdown.length - 1 ? "none" : "1px solid var(--line)",
-                }}
-              >
-                <div className="flex-1 min-w-0">
-                  <div style={{ fontWeight: 650, fontSize: 14 }}>{r.label}</div>
-                  {r.hint && (
-                    <div className="t-xs" style={{ color: "var(--text-3)" }}>
-                      {r.hint}
-                    </div>
-                  )}
-                </div>
-                <span
-                  className="tnum"
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontWeight: 800,
-                    fontSize: 16,
-                    color: r.pts < 0 ? "var(--bad)" : "var(--text)",
-                  }}
-                >
-                  {r.pts > 0 ? "+" : ""}
-                  {r.pts}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      <PointsBreakdown
+        data={breakdownData}
+        norisk={norisk}
+        title={`How ${firstName}'s ${points} points add up`}
+      />
 
       <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
         Tournament calls
