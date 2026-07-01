@@ -104,7 +104,7 @@ const STEPS: Step[] = [
   {
     icon: "dice",
     title: "Side bets on every tie",
-    body: `Both Teams To Score is a Yes/No call on any match (win +${BTTS_REWARD}, a miss costs ${Math.abs(BTTS_PENALTY)}). Knockouts add a “how it ends” long-shot — back “Goes to extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) OR “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}), but not both (a shootout is also extra time). Skip it if you reckon it ends in 90.`,
+    body: `Both Teams To Score is a Yes/No call on any match (win +${BTTS_REWARD}, a miss costs ${Math.abs(BTTS_PENALTY)}). Knockouts add a “how it ends” long-shot — back “Decided in extra time?” (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) OR “Decided on penalties?” (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}), but not both — a shootout counts as penalties, not extra time. Skip it if you reckon it ends in 90.`,
   },
   {
     icon: "flame",

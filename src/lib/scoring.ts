@@ -153,26 +153,20 @@ export function scoreSideBet(
 // pens p≈0.17 — you must genuinely lean that way to profit.
 export type KoMarket = "et" | "pens";
 
-// "Goes to extra time?" / "Decided on penalties?" are OPT-IN long-shot bets — you
-// only ever back the YES (the rarer, exciting outcome). There's deliberately no
-// "no" side: a two-sided market on a ~20-30% event forces ugly lopsided odds (a
-// +1 win that risks −6), so instead you simply don't place the bet if you reckon
-// it won't happen. Payouts are deliberately CONSERVATIVE — the break-even win
-// rate sits ABOVE the worst historical rate, so a blind "always bet yes" is
-// firmly −EV (no farmable edge) even in an outlier tournament; only a strong read
-// of a specific tie profits:
-//   ET   ≈ 30% of WC knockouts → +3/−2, break-even 40% (the R32 round, being more
-//         lopsided, should only lower the ET rate)
-//   pens ≈ 20% since 1986 (Opta), peak 31% in 2022 → +4/−2, break-even 33% (above
-//         even that record). pens pays more than ET because it's rarer.
-// (pens ⊂ ET: a shootout also counts as "went to extra time".)
+// "Decided in extra time?" / "Decided on penalties?" — the two MUTUALLY EXCLUSIVE
+// ways a tie is settled beyond 90 minutes (extra-time goals vs a shootout). You
+// back at most one. "Extra time" does NOT include penalties — a shootout is the
+// pens market. Yes-only opt-in long-shots. Payouts are owner-set and unchanged:
+// ET +3/−2, pens +4/−2. Note: ET-only (~11%) is now the rarer outcome, so +3/−2
+// is a tough price for it — nudge it up if it needs to be more tempting.
 export const KO_SIDE_BET: Record<KoMarket, { win: number; miss: number }> = {
-  et: { win: 3, miss: -2 }, // EV ≈ 0.30·3 − 0.70·2 = −0.5
-  pens: { win: 4, miss: -2 }, // EV ≈ 0.20·4 − 0.80·2 = −0.8
+  et: { win: 3, miss: -2 }, // "decided in extra time" (NOT pens)
+  pens: { win: 4, miss: -2 }, // "decided on penalties" (shootout)
 };
 
 export function actualEt(decidedIn: MatchDecidedIn | null | undefined): "yes" | "no" {
-  return decidedIn === "extra_time" || decidedIn === "penalties" ? "yes" : "no";
+  // ET-only: decided IN extra time. A shootout is the PENALTIES market, not this.
+  return decidedIn === "extra_time" ? "yes" : "no";
 }
 export function actualPens(decidedIn: MatchDecidedIn | null | undefined): "yes" | "no" {
   return decidedIn === "penalties" ? "yes" : "no";

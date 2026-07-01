@@ -469,8 +469,8 @@ export default function ScoringPage() {
 
           {/* Extra time (knockouts) */}
           <Row
-            title="Side bet · goes to extra time? (knockouts)"
-            desc={`Back it only if you sense a tight tie — right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}. Pick this OR penalties, not both. Think it ends in 90? Just don't bet.`}
+            title="Side bet · decided in extra time? (knockouts)"
+            desc={`Wins only if it's settled IN extra time — a shootout is the penalties bet, not this. Right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}. Pick this OR penalties, not both.`}
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.et.win}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>
@@ -480,7 +480,7 @@ export default function ScoringPage() {
           {/* Penalties (knockouts) */}
           <Row
             title="Side bet · decided on penalties? (knockouts)"
-            desc={`A shootout is rare, so it pays the most — right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}. Pick this OR extra time, not both.`}
+            desc={`Wins on a shootout — right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}. Pick this OR extra time, not both.`}
           >
             <span style={{ color: "var(--good)", fontWeight: 800 }}>+{KO_SIDE_BET.pens.win}</span>
             <span style={{ color: "var(--text-3)" }}> / </span>

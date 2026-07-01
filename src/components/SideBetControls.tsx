@@ -13,17 +13,18 @@ type Pick = "yes" | "no" | null;
 
 const QUESTION: Record<SideBetMarket, string> = {
   btts: "Both teams to score?",
-  et: "Goes to extra time?",
+  et: "Decided in extra time?",
   pens: "Decided on penalties?",
 };
 
 /**
  * Opt-in gambles for a single match plus the once-per-day joker. "Both teams to
  * score?" is a two-sided Yes/No call on any match. Knockouts add the dramatic-
- * ending market — "goes to extra time?" and "decided on penalties?" — which are
- * MUTUALLY EXCLUSIVE yes-only long-shots: you back at most one (a shootout is
- * also extra time, so betting both makes no sense). Shown only for eligible,
- * still-open matches; writes go through RPC-backed server actions.
+ * ending market — "decided in extra time?" and "decided on penalties?" — the two
+ * MUTUALLY EXCLUSIVE ways a tie ends beyond 90 minutes (yes-only long-shots; you
+ * back at most one). Extra time here does NOT include a shootout — that's the
+ * pens bet. Shown only for eligible, still-open matches; writes go through
+ * RPC-backed server actions.
  */
 export function SideBetControls({
   matchId,
@@ -343,7 +344,7 @@ export function SideBetControls({
                   ? ([
                       [
                         "How the tie ends (extra time or pens)",
-                        `Two long-shots you back when you sense a tight tie — extra time (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) or penalties (rarer, so it pays more: right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). Pick at most ONE — a shootout is also extra time. Skip both if you think it ends in 90.`,
+                        `Two long-shots on how the tie ends beyond 90 — decided in extra time (right +${KO_SIDE_BET.et.win}, wrong ${KO_SIDE_BET.et.miss}) or on penalties (right +${KO_SIDE_BET.pens.win}, wrong ${KO_SIDE_BET.pens.miss}). Back at most ONE — a shootout counts as penalties, not extra time. Skip both if you think it ends in 90.`,
                       ],
                     ] as [string, string][])
                   : []),

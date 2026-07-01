@@ -157,8 +157,8 @@ export async function saveSideBet(input: {
       return { ok: false, error: error.message };
     }
 
-    // ET and penalties are mutually exclusive — a shootout is also extra time, so
-    // you only ever back one. Once this one is saved, drop the opposite.
+    // ET and penalties are the two mutually-exclusive ways a tie ends beyond 90,
+    // so you only ever back one. Once this one is saved, drop the opposite.
     if (input.market === "et" || input.market === "pens") {
       const other = input.market === "et" ? "pens" : "et";
       await supabase.rpc("clear_side_bet", { p_match_id: input.matchId, p_market: other });
