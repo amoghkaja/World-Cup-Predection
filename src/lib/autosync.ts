@@ -1,8 +1,10 @@
 import { after } from "next/server";
 import { getSiteUrl } from "@/lib/env";
 
-// Per warm server instance — good enough as a throttle; the sync endpoint is
-// idempotent and football-data allows 10 req/min.
+// Per warm server instance — a cheap first gate that avoids even the fetch.
+// The authoritative throttle is GLOBAL: the sync route claims a single-row
+// sync_throttle table (migration 0020) for src=auto runs, so many instances
+// collapse to at most one football-data call per window.
 let lastAttempt = 0;
 const THROTTLE_MS = 3 * 60_000;
 // Only chase results while a match is plausibly in play / just ended.
@@ -34,7 +36,7 @@ export function maybeKickResultsSync(
   lastAttempt = now;
   after(async () => {
     try {
-      await fetch(`${getSiteUrl()}/api/cron/sync-results`, {
+      await fetch(`${getSiteUrl()}/api/cron/sync-results?src=auto`, {
         headers: { authorization: `Bearer ${secret}` },
         cache: "no-store",
       });

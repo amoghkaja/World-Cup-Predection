@@ -85,6 +85,37 @@ function authorized(req: NextRequest): boolean {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+// Minimum spacing between AUTO-triggered runs (page-render self-heal). The
+// scheduled cron and the admin button bypass the claim but still stamp the row.
+const AUTO_THROTTLE_MS = 3 * 60_000;
+
+/**
+ * Claim the right to run, globally. Auto-triggered runs (src=auto) only proceed
+ * if no sync stamped the row within the window — one atomic conditional UPDATE,
+ * so concurrent instances can't all pass. Other sources always run and stamp.
+ * Best-effort: if migration 0020 isn't applied, behave as before (run).
+ */
+async function claimSyncRun(admin: ReturnType<typeof createAdminClient>, auto: boolean): Promise<boolean> {
+  const now = new Date().toISOString();
+  try {
+    if (!auto) {
+      await admin.from("sync_throttle").update({ last_run_at: now }).eq("id", 1);
+      return true;
+    }
+    const cutoff = new Date(Date.now() - AUTO_THROTTLE_MS).toISOString();
+    const { data, error } = await admin
+      .from("sync_throttle")
+      .update({ last_run_at: now })
+      .eq("id", 1)
+      .lt("last_run_at", cutoff)
+      .select("id");
+    if (error) return true; // table missing / transient — don't block the sync
+    return (data ?? []).length > 0;
+  } catch {
+    return true;
+  }
+}
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -92,6 +123,14 @@ export async function GET(req: NextRequest) {
   const apiKey = process.env.FOOTBALL_DATA_KEY;
   if (!apiKey) {
     return NextResponse.json({ ok: false, error: "FOOTBALL_DATA_KEY is not set" }, { status: 500 });
+  }
+
+  // Claim the run BEFORE spending football-data budget — auto-triggered syncs
+  // from many warm instances collapse to at most one per window.
+  const auto = req.nextUrl.searchParams.get("src") === "auto";
+  const admin = createAdminClient();
+  if (!(await claimSyncRun(admin, auto))) {
+    return NextResponse.json({ ok: true, skipped: "throttled" });
   }
 
   const res = await fetch(API, { headers: { "X-Auth-Token": apiKey }, cache: "no-store" });
@@ -103,8 +142,6 @@ export async function GET(req: NextRequest) {
   if (apiMatches.length === 0) {
     return NextResponse.json({ ok: false, error: json.message ?? "no matches returned" }, { status: 502 });
   }
-
-  const admin = createAdminClient();
   const [{ data: teamsData }, { data: matchesData }] = await Promise.all([
     admin.from("teams").select("*"),
     admin.from("matches").select("*"),
