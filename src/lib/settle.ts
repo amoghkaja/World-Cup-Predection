@@ -2,21 +2,36 @@ import { createAdminClient } from "@/lib/supabase/server";
 import {
   FEATURE_CUTOFF_ISO,
   featuresActiveFor,
+  scorePrediction,
   scoreSideBet,
   scoreKoSideBet,
   scoreJoker,
   streakBonusFor,
+  tournamentDay,
   type SideBetPick,
   type KoMarket,
 } from "@/lib/scoring";
-import type { Match } from "@/lib/types";
+import { inChunks } from "@/lib/batch";
+import { rankBoard } from "@/lib/rank";
+import type { Match, Prediction } from "@/lib/types";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-async function inChunks<T>(items: T[], fn: (item: T) => Promise<unknown>, size = 20) {
-  for (let i = 0; i < items.length; i += size) {
-    await Promise.all(items.slice(i, i + size).map(fn));
-  }
+/**
+ * Re-score every main prediction for a finished match. Shared by both
+ * settlement entry points (admin saveMatchResult and the results sync) so the
+ * loops can't drift apart. Run BEFORE settleMatchSideEffects — the joker reads
+ * the freshly written predictions.points_awarded.
+ */
+export async function rescoreMatchPredictions(admin: Admin, match: Match): Promise<void> {
+  const { data: preds } = await admin.from("predictions").select("*").eq("match_id", match.id);
+  await inChunks((preds ?? []) as Prediction[], async (p) => {
+    const pts = scorePrediction(p, match);
+    await admin
+      .from("predictions")
+      .update({ points_awarded: pts, scored: true })
+      .eq("id", p.id);
+  });
 }
 
 /**
@@ -137,13 +152,6 @@ export async function recomputeStreaks(admin: Admin): Promise<void> {
   if (streakRows.length) await admin.from("streak_bonuses").insert(streakRows);
 }
 
-const BERLIN_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Berlin",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
 /**
  * Capture each player's current rank ONCE per tournament (Berlin) day, so the
  * leaderboard can show movement arrows (today's rank vs this snapshot). Safe to
@@ -158,35 +166,28 @@ export async function captureDailyRankSnapshot(admin: Admin): Promise<void> {
       .order("captured_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const today = BERLIN_DAY.format(new Date());
-    if (latest && BERLIN_DAY.format(new Date((latest as { captured_at: string }).captured_at)) === today) {
+    // Same canonical league day as the joker allowance (Europe/Berlin).
+    const today = tournamentDay(new Date().toISOString());
+    if (latest && tournamentDay((latest as { captured_at: string }).captured_at) === today) {
       return; // already captured today
     }
 
     const { data } = await admin
       .from("leaderboard")
       .select("user_id, total_points, correct_matches, display_name");
-    const rows = ((data ?? []) as {
+    const rows = (data ?? []) as {
       user_id: string;
       total_points: number;
       correct_matches: number;
       display_name: string | null;
-    }[]).sort(
-      (a, b) =>
-        b.total_points - a.total_points ||
-        b.correct_matches - a.correct_matches ||
-        (a.display_name ?? "").localeCompare(b.display_name ?? "")
-    );
+    }[];
     if (rows.length === 0) return;
 
-    let prevPts = NaN;
-    let prevRank = 0;
-    const snap = rows.map((r, i) => {
-      const rank = r.total_points === prevPts ? prevRank : i + 1;
-      prevPts = r.total_points;
-      prevRank = rank;
-      return { user_id: r.user_id, rank, captured_at: new Date().toISOString() };
-    });
+    const snap = rankBoard(rows).map((r) => ({
+      user_id: r.user_id,
+      rank: r.rank,
+      captured_at: new Date().toISOString(),
+    }));
 
     const ZERO = "00000000-0000-0000-0000-000000000000";
     await admin.from("rank_snapshots").delete().neq("user_id", ZERO);

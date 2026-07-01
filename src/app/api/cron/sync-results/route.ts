@@ -3,9 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { TAG_LEADERBOARD, TAG_MATCHES, TAG_PLAYERS } from "@/lib/queries";
-import { scorePrediction } from "@/lib/scoring";
-import { settleMatchSideEffects, recomputeStreaks, captureDailyRankSnapshot } from "@/lib/settle";
-import type { Match, MatchStage, Prediction, Team } from "@/lib/types";
+import {
+  settleMatchSideEffects,
+  recomputeStreaks,
+  rescoreMatchPredictions,
+  captureDailyRankSnapshot,
+} from "@/lib/settle";
+import type { Match, MatchStage, Team } from "@/lib/types";
 
 // Single call to football-data.org returns all 104 World Cup matches. We update
 // kickoff times, fill knockout teams as the bracket fills, apply final scores, and
@@ -267,21 +271,10 @@ export async function GET(req: NextRequest) {
 
     if (needRescore) {
       report.applied.push(our.id);
-      const { data: preds } = await admin.from("predictions").select("*").eq("match_id", our.id);
-      const rows = (preds ?? []) as Prediction[];
-      for (let i = 0; i < rows.length; i += 20) {
-        await Promise.all(
-          rows.slice(i, i + 20).map(async (p) => {
-            const pts = scorePrediction(p, updated as Match);
-            await admin
-              .from("predictions")
-              .update({ points_awarded: pts, scored: true })
-              .eq("id", p.id);
-          })
-        );
-      }
-      // Side bets + joker for this match (after the main rescore above). The
-      // global streak rebuild runs once at the end of the sync.
+      // Main picks first, then side bets + joker (the joker reads the freshly
+      // written prediction points). Shared helpers — identical to the admin
+      // saveMatchResult path. The global streak rebuild runs once per sync.
+      await rescoreMatchPredictions(admin, updated as Match);
       await settleMatchSideEffects(admin, updated as Match);
     }
   }

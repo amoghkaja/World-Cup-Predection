@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { BOARD_COOKIE, parseBoardView, type BoardView } from "@/lib/board-cookie";
+import { rankBoard } from "@/lib/rank";
 import { createStaticClient } from "@/lib/supabase/static";
 import type {
   GroupPrediction,
@@ -127,20 +128,10 @@ export const getLeaderboard = unstable_cache(
       /* table not present yet */
     }
 
-    const rows = ((data ?? []) as LeaderboardRow[]).sort(
-      (a, b) =>
-        b.total_points - a.total_points ||
-        b.correct_matches - a.correct_matches ||
-        (a.display_name ?? "").localeCompare(b.display_name ?? "")
-    );
-    let prevPts = NaN;
-    let prevRank = 0;
-    return rows.map((r, i) => {
-      const rank = r.total_points === prevPts ? prevRank : i + 1;
-      prevPts = r.total_points;
-      prevRank = rank;
-      return { ...r, rank, prevRank: snap.get(r.user_id) ?? null };
-    });
+    return rankBoard((data ?? []) as LeaderboardRow[]).map((r) => ({
+      ...r,
+      prevRank: snap.get(r.user_id) ?? null,
+    }));
   },
   ["leaderboard"],
   { tags: [TAG_LEADERBOARD], revalidate: 60 }
@@ -192,26 +183,12 @@ export async function getBoardView(): Promise<BoardView> {
  * Stored scores are never touched.
  */
 export function applyNoGambleView(rows: RankedLeaderboardRow[]): RankedLeaderboardRow[] {
-  const adjusted = rows
-    .map((r) => ({
-      ...r,
-      total_points: r.total_points - (r.side_bet_points ?? 0) - (r.joker_points ?? 0),
-    }))
-    .sort(
-      (a, b) =>
-        b.total_points - a.total_points ||
-        b.correct_matches - a.correct_matches ||
-        (a.display_name ?? "").localeCompare(b.display_name ?? "")
-    );
-  let prevPts = NaN;
-  let prevRank = 0;
-  return adjusted.map((r, i) => {
-    const rank = r.total_points === prevPts ? prevRank : i + 1;
-    prevPts = r.total_points;
-    prevRank = rank;
-    // No movement arrows on the view-only no-gamble board (snapshot is the real board).
-    return { ...r, rank, prevRank: null };
-  });
+  const adjusted = rows.map((r) => ({
+    ...r,
+    total_points: r.total_points - (r.side_bet_points ?? 0) - (r.joker_points ?? 0),
+  }));
+  // No movement arrows on the view-only no-gamble board (snapshot is the real board).
+  return rankBoard(adjusted).map((r) => ({ ...r, prevRank: null }));
 }
 
 /** First kickoff of the tournament = the pre-tournament picks lock. */

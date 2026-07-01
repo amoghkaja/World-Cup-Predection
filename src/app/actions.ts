@@ -11,17 +11,24 @@ import {
 } from "@/lib/queries";
 import { isLocked } from "@/lib/format";
 import {
-  scorePrediction,
+  actualOutcome,
   scorePodium,
   featuresLive,
   GROUP_QUALIFIER_POINTS,
   GOLDEN_BOOT_POINTS,
   type SideBetPick,
 } from "@/lib/scoring";
-import { settleMatchSideEffects, recomputeStreaks } from "@/lib/settle";
-import type { Match, PodiumPosition, PredOutcome, Prediction, SideBetMarket } from "@/lib/types";
+import { inChunks } from "@/lib/batch";
+import {
+  settleMatchSideEffects,
+  recomputeStreaks,
+  rescoreMatchPredictions,
+} from "@/lib/settle";
+import type { Match, PodiumPosition, PredOutcome, SideBetMarket } from "@/lib/types";
 
 type Result<T = void> = { ok: true; data?: T } | { ok: false; error: string };
+
+const LOCKED_MSG = "This match is locked — the deadline has passed.";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -38,15 +45,22 @@ async function requireAdmin() {
   return { userId };
 }
 
-/** Run row updates a few at a time instead of strictly one-by-one. */
-async function inChunks<T>(items: T[], fn: (item: T) => Promise<unknown>, size = 20) {
-  for (let i = 0; i < items.length; i += size) {
-    await Promise.all(items.slice(i, i + size).map(fn));
-  }
-}
-
 const isIntIn = (v: unknown, min: number, max: number): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
+
+const isSideBetMarket = (v: unknown): v is SideBetMarket =>
+  v === "btts" || v === "et" || v === "pens";
+
+/** RLS blocks writes once a match kicks off — map that to the friendly message. */
+const isRlsDenied = (e: { code?: string; message: string }) =>
+  e.code === "42501" || /row-level security/i.test(e.message);
+
+/** Every surface that renders a match's pick/bet state. */
+function revalidateMatchSurfaces(matchId: number) {
+  revalidatePath("/dashboard");
+  revalidatePath(`/matches/${matchId}`);
+  revalidatePath("/predictions");
+}
 
 /** Accent/case-insensitive name key: "José Martínez " → "josemartinez". */
 const nameKey = (s: string) =>
@@ -77,14 +91,14 @@ export async function savePrediction(input: {
     if (!match) return { ok: false, error: "Match not found" };
     // Friendly pre-check; RLS enforces the same deadline authoritatively.
     if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
-      return { ok: false, error: "This match is locked — the deadline has passed." };
+      return { ok: false, error: LOCKED_MSG };
     }
 
     // Derive the outcome from the scoreline so the pair can never disagree.
     // A level knockout still needs the player's advancer call.
+    const fromScore = actualOutcome(home, away);
     let outcome: PredOutcome;
-    if (home > away) outcome = "home";
-    else if (away > home) outcome = "away";
+    if (fromScore !== "draw") outcome = fromScore;
     else if (match.stage === "group") outcome = "draw";
     else if (input.outcome === "home" || input.outcome === "away") outcome = input.outcome;
     else return { ok: false, error: "Pick who advances after a draw." };
@@ -102,16 +116,12 @@ export async function savePrediction(input: {
     );
     if (error) {
       // RLS blocks writes once the match has kicked off — surface a friendly message.
-      if (error.code === "42501" || /row-level security/i.test(error.message)) {
-        return { ok: false, error: "This match is locked — the deadline has passed." };
-      }
+      if (isRlsDenied(error)) return { ok: false, error: LOCKED_MSG };
       return { ok: false, error: error.message };
     }
 
-    revalidatePath("/dashboard");
     revalidatePath("/bracket");
-    revalidatePath(`/matches/${input.matchId}`);
-    revalidatePath("/predictions");
+    revalidateMatchSurfaces(input.matchId);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -129,16 +139,14 @@ export async function saveSideBet(input: {
 
     if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
     if (input.pick !== "yes" && input.pick !== "no") return { ok: false, error: "Invalid pick" };
-    if (input.market !== "btts" && input.market !== "et" && input.market !== "pens") {
-      return { ok: false, error: "Invalid market" };
-    }
+    if (!isSideBetMarket(input.market)) return { ok: false, error: "Invalid market" };
 
     if (!featuresLive()) return { ok: false, error: "Side bets unlock Monday." };
 
     const match = await getMatch(input.matchId);
     if (!match) return { ok: false, error: "Match not found" };
     if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
-      return { ok: false, error: "This match is locked — the deadline has passed." };
+      return { ok: false, error: LOCKED_MSG };
     }
     // BTTS is allowed on any match; the ET/pens markets only exist in knockouts.
     if ((input.market === "et" || input.market === "pens") && match.stage === "group") {
@@ -151,22 +159,20 @@ export async function saveSideBet(input: {
       p_pick: input.pick,
     });
     if (error) {
-      if (error.code === "42501" || /row-level security/i.test(error.message)) {
-        return { ok: false, error: "This match is locked — the deadline has passed." };
-      }
+      if (isRlsDenied(error)) return { ok: false, error: LOCKED_MSG };
       return { ok: false, error: error.message };
     }
 
     // ET and penalties are the two mutually-exclusive ways a tie ends beyond 90,
-    // so you only ever back one. Once this one is saved, drop the opposite.
+    // so you only ever back one. The save_side_bet RPC (migration 0019) already
+    // drops the opposite market; this explicit clear is kept as belt-and-braces
+    // for environments where 0019 hasn't been applied yet.
     if (input.market === "et" || input.market === "pens") {
       const other = input.market === "et" ? "pens" : "et";
       await supabase.rpc("clear_side_bet", { p_match_id: input.matchId, p_market: other });
     }
 
-    revalidatePath("/dashboard");
-    revalidatePath(`/matches/${input.matchId}`);
-    revalidatePath("/predictions");
+    revalidateMatchSurfaces(input.matchId);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -179,17 +185,13 @@ export async function clearSideBet(input: { matchId: number; market: SideBetMark
   try {
     const { supabase } = await requireUser();
     if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
-    if (input.market !== "btts" && input.market !== "et" && input.market !== "pens") {
-      return { ok: false, error: "Invalid market" };
-    }
+    if (!isSideBetMarket(input.market)) return { ok: false, error: "Invalid market" };
     const { error } = await supabase.rpc("clear_side_bet", {
       p_match_id: input.matchId,
       p_market: input.market,
     });
     if (error) return { ok: false, error: error.message };
-    revalidatePath("/dashboard");
-    revalidatePath(`/matches/${input.matchId}`);
-    revalidatePath("/predictions");
+    revalidateMatchSurfaces(input.matchId);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -206,15 +208,13 @@ export async function saveJoker(input: { matchId: number }): Promise<Result> {
     const match = await getMatch(input.matchId);
     if (!match) return { ok: false, error: "Match not found" };
     if (isLocked(match.kickoff_at) || match.status !== "scheduled") {
-      return { ok: false, error: "This match is locked — the deadline has passed." };
+      return { ok: false, error: LOCKED_MSG };
     }
 
     const { error } = await supabase.rpc("save_joker", { p_match_id: input.matchId });
     if (error) return { ok: false, error: error.message };
 
-    revalidatePath("/dashboard");
-    revalidatePath(`/matches/${input.matchId}`);
-    revalidatePath("/predictions");
+    revalidateMatchSurfaces(input.matchId);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -227,8 +227,7 @@ export async function clearJoker(input: { matchId: number }): Promise<Result> {
     if (!isIntIn(input.matchId, 1, 100000)) return { ok: false, error: "Invalid match" };
     const { error } = await supabase.rpc("clear_joker", { p_match_id: input.matchId });
     if (error) return { ok: false, error: error.message };
-    revalidatePath("/dashboard");
-    revalidatePath(`/matches/${input.matchId}`);
+    revalidateMatchSurfaces(input.matchId);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
@@ -502,18 +501,8 @@ export async function saveMatchResult(input: {
       .single();
     if (upErr || !updated) return { ok: false, error: upErr?.message ?? "Match not found" };
 
-    // Rescore every prediction for this match.
-    const { data: preds } = await admin
-      .from("predictions")
-      .select("*")
-      .eq("match_id", input.matchId);
-    await inChunks((preds ?? []) as Prediction[], async (p) => {
-      const pts = scorePrediction(p, updated as Match);
-      await admin
-        .from("predictions")
-        .update({ points_awarded: pts, scored: true })
-        .eq("id", p.id);
-    });
+    // Rescore every prediction for this match (shared with the results sync).
+    await rescoreMatchPredictions(admin, updated as Match);
 
     // When the Final or 3rd-place game is settled, re-derive and score the podium.
     const settledStage = (updated as Match).stage;
