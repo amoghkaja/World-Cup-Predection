@@ -90,7 +90,11 @@ export async function recomputeStreaks(admin: Admin): Promise<void> {
   // un-limited Supabase select returns at most 1000 rows, so once the league
   // passed 1000 settled-match predictions the newest ones were silently dropped
   // and the rebuild never saw recent correct picks (it broke streaks for everyone).
-  // Page through them all so nothing is missed.
+  // Page through them all so nothing is missed — ordered by the primary key so
+  // the pages are a stable, gap-free partition. Without an explicit ORDER BY,
+  // LIMIT/OFFSET paging is undefined in Postgres: consecutive pages can overlap
+  // OR skip rows, and a skipped *correct* pick silently breaks that player's
+  // streak (they'd stop reaching the 5/10/15 milestones).
   type PredRow = { user_id: string; match_id: number; points_awarded: number; scored: boolean };
   const preds: PredRow[] = [];
   for (let from = 0; ; from += 1000) {
@@ -98,6 +102,7 @@ export async function recomputeStreaks(admin: Admin): Promise<void> {
       .from("predictions")
       .select("user_id, match_id, points_awarded, scored")
       .in("match_id", settledIds)
+      .order("id")
       .range(from, from + 999);
     const batch = (data ?? []) as PredRow[];
     preds.push(...batch);
