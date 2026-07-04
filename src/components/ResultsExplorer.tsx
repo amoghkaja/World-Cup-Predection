@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { GroupTable } from "@/lib/standings";
 import type { MatchWithTeams } from "@/lib/types";
 import { STAGE_LABELS } from "@/lib/types";
-import { zonedDayKey, zonedDayLabel } from "@/lib/format";
+import { zonedDayKey, zonedDayLabel, decidedNote } from "@/lib/format";
 import { Flag } from "./TeamBadge";
 import { Icon } from "./Icon";
 import { LocalKickoff } from "./LocalTime";
@@ -209,13 +209,23 @@ export function ResultsExplorer({
                   const done = isFinished(m);
                   const homeName = m.home_team?.name ?? m.home_placeholder ?? "TBD";
                   const awayName = m.away_team?.name ?? m.away_placeholder ?? "TBD";
-                  const winSide = done
-                    ? m.home_score! > m.away_score!
-                      ? 0
-                      : m.home_score! < m.away_score!
-                        ? 1
-                        : -1
-                    : -1;
+                  // Winner side: 0 = home, 1 = away, -1 = draw. A knockout carries
+                  // a winner_team_id even when the 90' score is level (decided in
+                  // extra time or on penalties), so a 1-1 shootout still highlights
+                  // who actually advanced instead of looking like an open draw.
+                  const winSide = !done
+                    ? -1
+                    : m.winner_team_id != null
+                      ? m.winner_team_id === m.home_team_id
+                        ? 0
+                        : m.winner_team_id === m.away_team_id
+                          ? 1
+                          : -1
+                      : m.home_score! > m.away_score!
+                        ? 0
+                        : m.home_score! < m.away_score!
+                          ? 1
+                          : -1;
                   return (
                     <div
                       key={m.id}
@@ -241,15 +251,27 @@ export function ResultsExplorer({
                       </span>
                       {done ? (
                         <span
-                          className="tnum"
-                          style={{
-                            fontFamily: "var(--font-display)",
-                            fontWeight: 800,
-                            fontSize: 16,
-                            whiteSpace: "nowrap",
-                          }}
+                          className="flex flex-col items-center"
+                          style={{ gap: 1, whiteSpace: "nowrap" }}
                         >
-                          {m.home_score}–{m.away_score}
+                          <span
+                            className="tnum"
+                            style={{
+                              fontFamily: "var(--font-display)",
+                              fontWeight: 800,
+                              fontSize: 16,
+                              lineHeight: 1.05,
+                            }}
+                          >
+                            {m.home_score}–{m.away_score}
+                          </span>
+                          {decidedNote(m) && (
+                            <span
+                              style={{ color: "var(--text-3)", fontSize: 10, fontWeight: 700 }}
+                            >
+                              {decidedNote(m)}
+                            </span>
+                          )}
                         </span>
                       ) : (
                         <span className="t-xs tnum" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
