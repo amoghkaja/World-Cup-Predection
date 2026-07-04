@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMatch, getMyPredictions, getMySideBets, getMyJokers, getSetupStatus } from "@/lib/queries";
-import { isLocked, zonedDayLabel, decidedNote } from "@/lib/format";
+import { isLocked, zonedDayLabel, decidedNoteNamed } from "@/lib/format";
 import { getViewerTimeZone } from "@/lib/tz";
 import { LocalTime } from "@/components/LocalTime";
 import {
@@ -131,9 +131,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <Flag flag={match.away_team?.flag_emoji} name={awayName} size="lg" />
         </div>
 
-        {status === "done" && decidedNote(match) && (
+        {status === "done" && decidedNoteNamed(match, match.home_team?.code, match.away_team?.code) && (
           <p className="t-xs text-center" style={{ color: "var(--text-3)", marginTop: 6 }}>
-            {decidedNote(match)}
+            {decidedNoteNamed(match, match.home_team?.code, match.away_team?.code)}
           </p>
         )}
 

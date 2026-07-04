@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { GroupTable } from "@/lib/standings";
 import type { MatchWithTeams } from "@/lib/types";
 import { STAGE_LABELS } from "@/lib/types";
-import { zonedDayKey, zonedDayLabel, decidedNote } from "@/lib/format";
+import { zonedDayKey, zonedDayLabel, decidedNoteNamed } from "@/lib/format";
 import { Flag } from "./TeamBadge";
 import { Icon } from "./Icon";
 import { LocalKickoff } from "./LocalTime";
@@ -265,11 +265,11 @@ export function ResultsExplorer({
                           >
                             {m.home_score}–{m.away_score}
                           </span>
-                          {decidedNote(m) && (
+                          {decidedNoteNamed(m, m.home_team?.code, m.away_team?.code) && (
                             <span
                               style={{ color: "var(--text-3)", fontSize: 10, fontWeight: 700 }}
                             >
-                              {decidedNote(m)}
+                              {decidedNoteNamed(m, m.home_team?.code, m.away_team?.code)}
                             </span>
                           )}
                         </span>

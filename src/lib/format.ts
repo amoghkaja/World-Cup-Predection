@@ -36,6 +36,39 @@ export function decidedNote(m: {
   return "a.e.t.";
 }
 
+/**
+ * Like decidedNote but NAMES who went through, so a level 90' knockout can't be
+ * misread. The 90' score is level (e.g. AUS 1–1 EGY) and the pens score is shown
+ * winner-first, so without the name "4–2 on pens" looks like the first-listed
+ * team won. Given the winner's code it returns e.g. "EGY won 4–2 on pens" /
+ * "ARG won a.e.t.". Falls back to decidedNote when the winner code is unknown.
+ */
+export function decidedNoteNamed(
+  m: {
+    decided_in?: string | null;
+    pens_home?: number | null;
+    pens_away?: number | null;
+    winner_team_id?: number | null;
+    home_team_id?: number | null;
+    away_team_id?: number | null;
+  },
+  homeCode: string | null | undefined,
+  awayCode: string | null | undefined
+): string | null {
+  const base = decidedNote(m);
+  if (!base) return null;
+  const winCode =
+    m.winner_team_id != null && m.winner_team_id === m.home_team_id
+      ? homeCode
+      : m.winner_team_id != null && m.winner_team_id === m.away_team_id
+        ? awayCode
+        : null;
+  if (!winCode) return base; // no team context — plain note
+  // "a.e.t." reads as an adjective ("EGY won a.e.t."); the pens/… score reads as
+  // the result ("EGY won 4–2 on pens").
+  return `${winCode} won ${base}`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Day grouping in the VIEWER's timezone.                              */
 /* The tz string travels server → client as a prop (sourced from the   */

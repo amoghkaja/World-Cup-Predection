@@ -10,7 +10,7 @@ import {
   bttsPenaltyFor,
   type MatchStreakState,
 } from "@/lib/scoring";
-import { isLocked, decidedNote } from "@/lib/format";
+import { isLocked, decidedNoteNamed } from "@/lib/format";
 import { Flag } from "@/components/TeamBadge";
 import { Icon } from "@/components/Icon";
 import { PointsBadge } from "@/components/PointsBadge";
@@ -171,14 +171,19 @@ export function MissedPickRow({
 }) {
   const home = match.home_team;
   const away = match.away_team;
-  const note = decidedNote(match);
+  const note = decidedNoteNamed(match, home?.code, away?.code);
+  const advancer = match.winner_team_id ?? null;
+  const homeOut = advancer != null && advancer === match.away_team_id;
+  const awayOut = advancer != null && advancer === match.home_team_id;
   return (
     <div style={{ borderBottom: last ? "none" : "1px solid var(--line)" }}>
       <div className="flex items-center gap-3" style={{ padding: "13px 16px", opacity: 0.9 }}>
         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <Flag flag={home?.flag_emoji} name={home?.name} size="sm" />
-            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text-2)" }}>
+            <span
+              style={{ fontWeight: 700, fontSize: 14, color: homeOut ? "var(--text-3)" : "var(--text-2)" }}
+            >
               {home?.code ?? "?"}
             </span>
             <span
@@ -187,7 +192,9 @@ export function MissedPickRow({
             >
               {match.home_score}–{match.away_score}
             </span>
-            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text-2)" }}>
+            <span
+              style={{ fontWeight: 700, fontSize: 14, color: awayOut ? "var(--text-3)" : "var(--text-2)" }}
+            >
               {away?.code ?? "?"}
             </span>
             <Flag flag={away?.flag_emoji} name={away?.name} size="sm" />
@@ -271,13 +278,22 @@ export function CompactPredictionRow({
   const home = match.home_team;
   const away = match.away_team;
 
+  // Knockout advancer: grey the side that went out, so a level 90' (e.g. 1–1)
+  // decided on pens/ET still reads as a win for the team that actually advanced
+  // instead of looking like an open draw.
+  const advancer = settled ? match.winner_team_id ?? null : null;
+  const homeOut = advancer != null && advancer === match.away_team_id;
+  const awayOut = advancer != null && advancer === match.home_team_id;
+
   return (
     <div style={{ borderBottom: last ? "none" : "1px solid var(--line)" }}>
       <div className="flex items-center gap-3" style={{ padding: "13px 16px" }}>
         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <Flag flag={home?.flag_emoji} name={home?.name} size="sm" />
-            <span style={{ fontWeight: 700, fontSize: 14 }}>{home?.code ?? "?"}</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: homeOut ? "var(--text-3)" : undefined }}>
+              {home?.code ?? "?"}
+            </span>
             <span
               className="tnum"
               style={{
@@ -289,7 +305,9 @@ export function CompactPredictionRow({
             >
               {settled ? `${match.home_score}–${match.away_score}` : "vs"}
             </span>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>{away?.code ?? "?"}</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: awayOut ? "var(--text-3)" : undefined }}>
+              {away?.code ?? "?"}
+            </span>
             <Flag flag={away?.flag_emoji} name={away?.name} size="sm" />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -315,7 +333,9 @@ export function CompactPredictionRow({
             </span>
             <span className="t-xs" style={{ color: "var(--text-3)" }}>
               {match.group_label ? `Group ${match.group_label}` : "Knockout"}
-              {settled && decidedNote(match) ? ` · ${decidedNote(match)}` : ""}
+              {settled && decidedNoteNamed(match, home?.code, away?.code)
+                ? ` · ${decidedNoteNamed(match, home?.code, away?.code)}`
+                : ""}
               {!settled && locked ? " · In progress" : ""}
             </span>
             {!settled && !locked && (
