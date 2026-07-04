@@ -215,23 +215,41 @@ export async function GET(req: NextRequest) {
     }
 
     // football-data v4: score.fullTime is the CUMULATIVE total (incl. extra time
-    // AND the shootout) — a 1-1 won on pens reports fullTime {7,6}. We store the
-    // 90-MINUTE score (score.regularTime), falling back to fullTime only for
-    // regulation matches (group games / KO decided in 90', where they're equal).
-    const dur = (fx.score.duration ?? "REGULAR").toUpperCase();
+    // AND the shootout) — a 1-1 won on pens can report an odd/cumulative fullTime.
+    // We store the 90-MINUTE score (score.regularTime). For a KNOCKOUT we only
+    // fall back to fullTime when the feed EXPLICITLY says the tie was decided in
+    // regulation (rawDur === "REGULAR"); if `duration` is missing or beyond-90 a
+    // fullTime fallback risks storing ET/shootout goals as the 90' score, so we
+    // wait for regularTime instead. Group games are always equal, so it's safe.
+    const rawDur = fx.score.duration ? fx.score.duration.toUpperCase() : null;
+    const dur = rawDur ?? "REGULAR";
     const beyondReg = dur === "EXTRA_TIME" || dur === "PENALTY_SHOOTOUT";
     const reg: FdScore | null =
-      fx.score.regularTime?.home != null ? fx.score.regularTime : beyondReg ? null : fx.score.fullTime;
+      fx.score.regularTime?.home != null
+        ? fx.score.regularTime
+        : our.stage === "group" || rawDur === "REGULAR"
+          ? fx.score.fullTime
+          : null;
     const scoreReady = reg != null && reg.home != null && reg.away != null;
 
-    // Delay guard: if the feed says a knockout went to ET/pens but regularTime
-    // hasn't landed yet (free-tier lag), DON'T finalize off the cumulative score —
-    // wait for the next poll. Mirror it as "live" below.
-    if (FINISHED.has(fx.status) && teamsKnown && beyondReg && !scoreReady) {
+    // A level 90' knockout that still produced a winner MUST have been settled
+    // beyond regulation (extra time or a shootout). If the feed hasn't told us yet
+    // WHICH (no/late `duration`), we can't finalize: the ET/pens side bets settle
+    // off decided_in and guessing "regular" would pay them out wrong. Wait it out.
+    const hasWinner = fx.score.winner === "HOME_TEAM" || fx.score.winner === "AWAY_TEAM";
+    const undecidedBeyond =
+      our.stage !== "group" && scoreReady && reg!.home === reg!.away && hasWinner && !beyondReg;
+
+    const finished = FINISHED.has(fx.status) && scoreReady && teamsKnown && !undecidedBeyond;
+
+    // Delay guard diagnostic: the feed marks this knockout finished but we're
+    // deliberately holding off — either the 90' score (regularTime) hasn't landed
+    // or the ET/pens split isn't known yet. It settles on the poll the data lands
+    // (or the admin enters it by hand). Never store a guessed knockout scoreline.
+    if (FINISHED.has(fx.status) && teamsKnown && our.stage !== "group" && !finished) {
       report.deferred.push(our.label ?? String(our.id));
     }
 
-    const finished = FINISHED.has(fx.status) && scoreReady && teamsKnown;
     let needRescore = false;
     if (finished && reg) {
       const ourHomeId = (updates.home_team_id as number | undefined) ?? our.home_team_id;
@@ -247,13 +265,16 @@ export async function GET(req: NextRequest) {
             : fx.score.winner === "AWAY_TEAM"
               ? awayId
               : null;
-      // How the tie was decided (group rows always null → behaves exactly as before).
+      // How the tie was decided (group rows always null → behaves exactly as
+      // before). We only reach here for a knockout once decided_in is knowable —
+      // a level 90' with an unknown ET/pens split was deferred above — so a
+      // missing `duration` here means a decisive 90' result: regular time.
       const decidedIn =
         our.stage === "group"
           ? null
-          : dur === "PENALTY_SHOOTOUT"
+          : rawDur === "PENALTY_SHOOTOUT"
             ? "penalties"
-            : dur === "EXTRA_TIME"
+            : rawDur === "EXTRA_TIME"
               ? "extra_time"
               : "regular";
       const et = fx.score.extraTime?.home != null ? flip(fx.score.extraTime) : { home: null, away: null };

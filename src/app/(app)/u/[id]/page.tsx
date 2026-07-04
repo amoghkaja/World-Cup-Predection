@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getCurrentUser,
   getLeaderboard,
+  getMatches,
   getTeams,
   podiumWindows,
   getBoardView,
@@ -22,10 +23,11 @@ import type {
   TournamentPrediction,
 } from "@/lib/types";
 import { isLocked } from "@/lib/format";
+import { featuresActiveFor, streakProgression } from "@/lib/scoring";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/TeamBadge";
-import { CompactPredictionRow } from "@/components/CompactPredictionRow";
+import { CompactPredictionRow, MissedPickRow } from "@/components/CompactPredictionRow";
 import { PointsBreakdown } from "@/components/PointsBreakdown";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +69,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
     teams,
     windows,
     view,
+    allMatches,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
     getLeaderboard(),
@@ -80,6 +83,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
     getTeams(),
     podiumWindows(),
     getBoardView(),
+    getMatches(),
   ]);
   if (!prof) notFound();
   const profile = prof as Profile;
@@ -106,9 +110,40 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   const rank = mine?.rank ?? null;
   const points = mine?.total_points ?? 0;
 
-  const items = ((rows ?? []) as unknown as Row[])
-    .filter((p) => p.match)
-    .sort((a, b) => b.match!.kickoff_at.localeCompare(a.match!.kickoff_at));
+  const picks = ((rows ?? []) as unknown as Row[]).filter((p) => p.match);
+
+  // Streak walk over every in-scope settled match (the public match list),
+  // using this player's picks to decide which they got right — the same walk as
+  // the server's recomputeStreaks, so each row's flame matches their badge.
+  const predByMatch = new Map<number, Row>();
+  for (const p of picks) predByMatch.set(p.match_id, p);
+  const settledChrono = allMatches
+    .filter(
+      (m) => m.status === "final" && m.home_score != null && featuresActiveFor(m.kickoff_at)
+    )
+    .sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at) || a.id - b.id);
+  const correctIds = new Set<number>();
+  for (const m of settledChrono) {
+    const p = predByMatch.get(m.id);
+    if (p?.scored && p.points_awarded > 0) correctIds.add(m.id);
+  }
+  const streakByMatch = streakProgression(settledChrono, correctIds);
+
+  // Settled matches they never picked → "missed" rows. RLS reveals a player's
+  // picks once a match kicks off, so a settled match with no pred row here
+  // reliably means they skipped it (which also breaks their streak).
+  const missed = settledChrono.filter((m) => !predByMatch.has(m.id));
+
+  type TRow =
+    | { kind: "pick"; match: MatchWithTeams; pred: Row }
+    | { kind: "miss"; match: MatchWithTeams };
+  const timeline: TRow[] = [
+    ...picks.map((p) => ({ kind: "pick" as const, match: p.match as MatchWithTeams, pred: p })),
+    ...missed.map((m) => ({ kind: "miss" as const, match: m })),
+  ].sort(
+    (a, b) =>
+      b.match.kickoff_at.localeCompare(a.match.kickoff_at) || b.match.id - a.match.id
+  );
 
   // Side bets & jokers, keyed by match for the per-row result chips.
   const sideBets = (sideBetRows ?? []) as SideBet[];
@@ -123,7 +158,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
   // Points breakdown — every source that feeds the leaderboard total, so the
   // number on the card is never a mystery. Only non-zero rows are shown.
   const sum = <T,>(arr: T[], f: (x: T) => number) => arr.reduce((s, x) => s + f(x), 0);
-  const mainPts = sum(items, (p) => p.points_awarded);
+  const mainPts = sum(picks, (p) => p.points_awarded);
   const groupPts = sum(((groups ?? []) as GroupPrediction[]), (g) => g.points_awarded);
   const tournPts = sum(((tourn ?? []) as TournamentPrediction[]), (t) => t.points_awarded);
   const podiumPts = sum(podiumPicks, (p) => p.points_awarded);
@@ -260,7 +295,7 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
         Their picks · locked matches only
       </div>
 
-      {items.length === 0 ? (
+      {timeline.length === 0 ? (
         <div className="card" style={{ padding: "32px 20px", textAlign: "center" }}>
           <p className="t-sm" style={{ color: "var(--text-3)" }}>
             Nothing to show yet — you&rsquo;ll see {firstName}&rsquo;s predictions once those matches
@@ -269,17 +304,28 @@ export default async function UserPicksPage({ params }: { params: Promise<{ id: 
         </div>
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
-          {items.map((p, i) => (
-            <CompactPredictionRow
-              key={p.id}
-              match={p.match as MatchWithTeams}
-              pred={p}
-              last={i === items.length - 1}
-              ownerName={firstName}
-              sideBets={sidesByMatch.get(p.match_id)}
-              joker={jokerByMatch.get(p.match_id) ?? null}
-            />
-          ))}
+          {timeline.map((r, i) =>
+            r.kind === "pick" ? (
+              <CompactPredictionRow
+                key={`p-${r.match.id}`}
+                match={r.match}
+                pred={r.pred}
+                last={i === timeline.length - 1}
+                ownerName={firstName}
+                sideBets={sidesByMatch.get(r.match.id)}
+                joker={jokerByMatch.get(r.match.id) ?? null}
+                streak={streakByMatch.get(r.match.id)}
+              />
+            ) : (
+              <MissedPickRow
+                key={`m-${r.match.id}`}
+                match={r.match}
+                last={i === timeline.length - 1}
+                ownerName={firstName}
+                streak={streakByMatch.get(r.match.id)}
+              />
+            )
+          )}
         </div>
       )}
     </div>

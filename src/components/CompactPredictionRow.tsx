@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import type { MatchStage, MatchWithTeams, Prediction, SideBet, JokerPick } from "@/lib/types";
-import { actualOutcomeForMatch, BTTS_REWARD, KO_SIDE_BET, JOKER_PENALTY_BY_STAGE, bttsPenaltyFor } from "@/lib/scoring";
+import {
+  actualOutcomeForMatch,
+  BTTS_REWARD,
+  KO_SIDE_BET,
+  JOKER_PENALTY_BY_STAGE,
+  bttsPenaltyFor,
+  type MatchStreakState,
+} from "@/lib/scoring";
 import { isLocked, decidedNote } from "@/lib/format";
 import { Flag } from "@/components/TeamBadge";
 import { Icon } from "@/components/Icon";
@@ -91,6 +98,129 @@ function sideLabel(b: SideBet): string {
   return `BTTS ${b.pick === "yes" ? "Y" : "N"}`;
 }
 
+// Per-match streak state, computed by the timeline (streakProgression) from the
+// ordered settled matches — same walk as the server's recomputeStreaks.
+export type MatchStreak = MatchStreakState;
+
+// The little flame that shows "what streak this match achieved": a lit flame with
+// the run length while a streak is alive (gold + "+N" on a banked milestone), and
+// a muted "streak reset" marker on the match where a run ended — so a player can
+// see exactly where their streak broke instead of just seeing it drop to 0.
+export function StreakChip({ streak }: { streak: MatchStreak }) {
+  if (streak.run >= 1) {
+    const milestone = streak.banked > 0;
+    return (
+      <span
+        className="inline-flex items-center tnum"
+        title={
+          milestone
+            ? `${streak.run} correct in a row — +${streak.banked} streak bonus banked`
+            : `${streak.run} correct in a row`
+        }
+        style={{
+          gap: 4,
+          fontSize: 11,
+          fontWeight: 800,
+          padding: "2px 7px",
+          borderRadius: 999,
+          background: milestone ? "var(--gold)" : "var(--gold-soft)",
+          color: milestone ? "var(--on-gold)" : "var(--gold-strong)",
+        }}
+      >
+        <Icon name="flame" size={11} sw={2.4} />
+        {streak.run}
+        {milestone ? ` · +${streak.banked}` : ""}
+      </span>
+    );
+  }
+  if (streak.broke) {
+    return (
+      <span
+        className="inline-flex items-center"
+        title="Your correct-pick streak reset here"
+        style={{
+          gap: 4,
+          fontSize: 10.5,
+          fontWeight: 700,
+          padding: "2px 7px",
+          borderRadius: 999,
+          background: "var(--surface-2)",
+          color: "var(--text-3)",
+        }}
+      >
+        <Icon name="flame" size={10.5} /> streak reset
+      </span>
+    );
+  }
+  return null;
+}
+
+// A settled match the player never picked. Shown in the history so the timeline
+// is complete (and so a skipped match — which also breaks the streak — is
+// visible as the reason a run ended). Deliberately subdued vs. a real pick.
+export function MissedPickRow({
+  match,
+  last,
+  streak,
+  ownerName,
+}: {
+  match: MatchWithTeams;
+  last?: boolean;
+  streak?: MatchStreak;
+  ownerName?: string;
+}) {
+  const home = match.home_team;
+  const away = match.away_team;
+  const note = decidedNote(match);
+  return (
+    <div style={{ borderBottom: last ? "none" : "1px solid var(--line)" }}>
+      <div className="flex items-center gap-3" style={{ padding: "13px 16px", opacity: 0.9 }}>
+        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Flag flag={home?.flag_emoji} name={home?.name} size="sm" />
+            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text-2)" }}>
+              {home?.code ?? "?"}
+            </span>
+            <span
+              className="tnum"
+              style={{ color: "var(--text-2)", fontWeight: 800, fontSize: 13, margin: "0 2px" }}
+            >
+              {match.home_score}–{match.away_score}
+            </span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text-2)" }}>
+              {away?.code ?? "?"}
+            </span>
+            <Flag flag={away?.flag_emoji} name={away?.name} size="sm" />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className="pill inline-flex items-center"
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--text-3)",
+                fontSize: 11,
+                padding: "3px 9px",
+                gap: 4,
+              }}
+            >
+              <Icon name="minus" size={11} sw={2.6} />
+              {ownerName ? `${ownerName} missed this` : "Missed pick"}
+            </span>
+            <span className="t-xs" style={{ color: "var(--text-3)" }}>
+              {match.group_label ? `Group ${match.group_label}` : "Knockout"}
+              {note ? ` · ${note}` : ""}
+            </span>
+            {streak && <StreakChip streak={streak} />}
+          </div>
+        </div>
+        <span className="t-sm" style={{ color: "var(--text-3)", fontWeight: 700, flex: "none" }}>
+          —
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function sideStakes(b: SideBet, stage: MatchStage): string {
   if (b.market === "et" || b.market === "pens") {
     const t = KO_SIDE_BET[b.market];
@@ -106,6 +236,7 @@ export function CompactPredictionRow({
   ownerName,
   sideBets,
   joker,
+  streak,
 }: {
   match: MatchWithTeams;
   pred: Prediction;
@@ -113,6 +244,7 @@ export function CompactPredictionRow({
   ownerName?: string;
   sideBets?: SideBet[];
   joker?: JokerPick | null;
+  streak?: MatchStreak;
 }) {
   const settled = match.status === "final" && match.home_score != null && match.away_score != null;
   const actual = actualOutcomeForMatch(match);
@@ -189,6 +321,7 @@ export function CompactPredictionRow({
             {!settled && !locked && (
               <Countdown kickoff={match.kickoff_at} variant="labeled" lockLabel="Locks in" />
             )}
+            {settled && streak && <StreakChip streak={streak} />}
           </div>
 
           {/* gamble chips — shown once the match has kicked off, whether or not

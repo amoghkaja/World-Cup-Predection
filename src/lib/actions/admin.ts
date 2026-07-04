@@ -279,9 +279,17 @@ export async function settleGoldenBoot(name: string): Promise<Result> {
   }
 }
 
-// Admin: (re)compute side bets / joker / streak across every
-// already-final eligible match. Idempotent — for backfilling after deploy or
-// re-running after tuning the scoring constants.
+// Admin: full re-derive of EVERY scored surface across every already-final
+// match — main predictions first, then side bets / joker, then the global
+// streak rebuild. Idempotent — for backfilling after a deploy or re-running
+// after tuning ANY scoring constant.
+//
+// Main predictions are rescored here too (not just the add-ons): the streak
+// rebuild reads predictions.points_awarded to decide who got each match right,
+// so if a main pick's points were ever stale (e.g. a knockout that settled off
+// a bad scoreline, or a change to OUTCOME_POINTS/EXACT_BONUS), the old code
+// left both the main total AND the streak wrong and this button couldn't fix
+// it. Now "Recompute" is the reliable "make everything correct" lever.
 export async function recomputeFeatureScoring(): Promise<Result> {
   try {
     await requireAdmin();
@@ -292,9 +300,13 @@ export async function recomputeFeatureScoring(): Promise<Result> {
       .eq("status", "final")
       .order("kickoff_at");
     for (const m of (finals ?? []) as Match[]) {
+      // Order matters: the joker in settleMatchSideEffects reads the freshly
+      // rescored predictions.points_awarded, so main picks must go first.
+      await rescoreMatchPredictions(admin, m);
       await settleMatchSideEffects(admin, m);
     }
     await recomputeStreaks(admin);
+    updateTag(TAG_MATCHES);
     updateTag(TAG_LEADERBOARD);
     return { ok: true };
   } catch (e) {

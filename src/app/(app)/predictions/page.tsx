@@ -8,10 +8,11 @@ import {
   getBoardView,
 } from "@/lib/queries";
 import { zonedDayKey, zonedDayLabel } from "@/lib/format";
+import { featuresActiveFor, streakProgression } from "@/lib/scoring";
 import { getViewerTimeZone } from "@/lib/tz";
 import type { MatchWithTeams, Prediction } from "@/lib/types";
 import { Icon } from "@/components/Icon";
-import { CompactPredictionRow } from "@/components/CompactPredictionRow";
+import { CompactPredictionRow, MissedPickRow } from "@/components/CompactPredictionRow";
 import { PointsBreakdown } from "@/components/PointsBreakdown";
 
 export const dynamic = "force-dynamic";
@@ -59,24 +60,61 @@ export default async function PredictionsPage({
   const hits = settled.filter(({ pred }) => pred.points_awarded > 0).length;
   const pendingCount = mine.length - settled.length;
 
-  const list = mine.filter(({ match }) => {
-    if (tab === "settled") return isSettled(match);
-    if (tab === "pending") return !isSettled(match);
+  // Streak walk over EVERY in-scope settled match in kickoff order — including
+  // ones this player skipped, because a skip resets the run just like a wrong
+  // pick. This is the same walk the server's recomputeStreaks does, so each
+  // row's flame matches the leaderboard badge. A match is "correct" when the
+  // player's pick actually scored points.
+  const settledChrono = matches
+    .filter((m) => isSettled(m) && featuresActiveFor(m.kickoff_at))
+    .sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at) || a.id - b.id);
+  const correctIds = new Set<number>();
+  for (const m of settledChrono) {
+    const p = preds.get(m.id);
+    if (p?.scored && p.points_awarded > 0) correctIds.add(m.id);
+  }
+  const streakByMatch = streakProgression(settledChrono, correctIds);
+
+  // Settled, in-scope matches the player never picked → "missed pick" rows, so
+  // the history is complete and a skipped match (which breaks the streak) shows
+  // up as the reason a run ended.
+  const missed = settledChrono.filter((m) => !preds.has(m.id));
+  const missedCount = missed.length;
+
+  // Unified timeline: real picks (settled + pending) plus missed settled matches.
+  type Row =
+    | { kind: "pick"; match: MatchWithTeams; pred: Prediction }
+    | { kind: "miss"; match: MatchWithTeams };
+  const allRows: Row[] = [
+    ...mine.map((x) => ({ kind: "pick" as const, match: x.match, pred: x.pred })),
+    ...missed.map((m) => ({ kind: "miss" as const, match: m })),
+  ];
+
+  const list = allRows.filter((r) => {
+    if (tab === "settled") return isSettled(r.match);
+    if (tab === "pending") return r.kind === "pick" && !isSettled(r.match);
     return true;
   });
 
-  // Group by the viewer's local day, newest day first.
-  const dayMap = new Map<string, { match: MatchWithTeams; pred: Prediction }[]>();
-  for (const item of list) {
-    const k = zonedDayKey(item.match.kickoff_at, tz);
-    (dayMap.get(k) ?? dayMap.set(k, []).get(k)!).push(item);
+  // Group by the viewer's local day, newest day first (and newest match first
+  // within a day, so picks and any missed matches interleave chronologically).
+  const dayMap = new Map<string, Row[]>();
+  for (const r of list) {
+    const k = zonedDayKey(r.match.kickoff_at, tz);
+    (dayMap.get(k) ?? dayMap.set(k, []).get(k)!).push(r);
+  }
+  for (const rows of dayMap.values()) {
+    rows.sort(
+      (a, b) =>
+        b.match.kickoff_at.localeCompare(a.match.kickoff_at) || b.match.id - a.match.id
+    );
   }
   const days = [...dayMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
   const summary: { label: string; value: string | number; icon: string; gold?: boolean }[] = [
     { label: "Match points", value: earned, icon: "bolt", gold: true },
     { label: "Correct results", value: `${hits}/${settled.length}`, icon: "target" },
-    { label: "Pending picks", value: pendingCount, icon: "clock" },
+    { label: pendingCount > 0 ? "Pending picks" : "Missed picks", value: pendingCount > 0 ? pendingCount : missedCount, icon: pendingCount > 0 ? "clock" : "minus" },
   ];
 
   return (
@@ -158,22 +196,32 @@ export default async function PredictionsPage({
         </div>
       )}
 
-      {days.map(([k, items]) => (
+      {days.map(([k, rows]) => (
         <div key={k} className="mb-[18px]">
           <div className="t-label mb-2" style={{ color: "var(--text-3)" }}>
-            {zonedDayLabel(items[0].match.kickoff_at, tz)}
+            {zonedDayLabel(rows[0].match.kickoff_at, tz)}
           </div>
           <div className="card" style={{ overflow: "hidden" }}>
-            {items.map((item, i) => (
-              <CompactPredictionRow
-                key={item.match.id}
-                match={item.match}
-                pred={item.pred}
-                last={i === items.length - 1}
-                sideBets={sidesByMatch.get(item.match.id)}
-                joker={jokers.byMatch.get(item.match.id) ?? null}
-              />
-            ))}
+            {rows.map((r, i) =>
+              r.kind === "pick" ? (
+                <CompactPredictionRow
+                  key={`p-${r.match.id}`}
+                  match={r.match}
+                  pred={r.pred}
+                  last={i === rows.length - 1}
+                  sideBets={sidesByMatch.get(r.match.id)}
+                  joker={jokers.byMatch.get(r.match.id) ?? null}
+                  streak={streakByMatch.get(r.match.id)}
+                />
+              ) : (
+                <MissedPickRow
+                  key={`m-${r.match.id}`}
+                  match={r.match}
+                  last={i === rows.length - 1}
+                  streak={streakByMatch.get(r.match.id)}
+                />
+              )
+            )}
           </div>
         </div>
       ))}

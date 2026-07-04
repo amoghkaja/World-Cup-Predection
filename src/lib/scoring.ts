@@ -246,6 +246,39 @@ export function streakBonusFor(streakLen: number, completingStage: MatchStage): 
   return Math.round(STREAK_REWARD * STREAK_STAGE_MULT[completingStage]);
 }
 
+/** One match's streak state for a player (for the history timeline). */
+export type MatchStreakState = {
+  run: number; // correct-in-a-row length AFTER this match (0 if it reset here)
+  banked: number; // streak bonus banked on this match (>0 only at a milestone)
+  broke: boolean; // the run reset AT this match (a live run ended here)
+};
+
+/**
+ * Walk a player's settled matches in chronological order and label each with its
+ * streak state — the SAME walk as settle.ts recomputeStreaks, so the history
+ * timeline shows exactly the run the leaderboard badge is derived from. Any
+ * settled match not in `correctIds` (a wrong pick OR a skipped match) resets the
+ * run, which is why a skipped match has to be part of `settledChrono`.
+ */
+export function streakProgression(
+  settledChrono: { id: number; stage: MatchStage }[],
+  correctIds: Set<number>
+): Map<number, MatchStreakState> {
+  const out = new Map<number, MatchStreakState>();
+  let run = 0;
+  for (const m of settledChrono) {
+    const correct = correctIds.has(m.id);
+    const prev = run;
+    run = correct ? run + 1 : 0;
+    out.set(m.id, {
+      run,
+      banked: correct ? streakBonusFor(run, m.stage) : 0,
+      broke: !correct && prev >= 1,
+    });
+  }
+  return out;
+}
+
 // --- Canonical league day for the "one joker per day" allowance: a single
 // fixed zone so every player's joker resets on the same boundary regardless of
 // their own timezone. MUST match the SQL tournament_day() function (migration
