@@ -17,9 +17,9 @@ const SLOTS: { pos: PodiumPosition; label: string; hint: string; icon: string; g
 ];
 
 const BANNER: Record<PodiumWindowState, string> = {
-  pre: "Window 1 is open — lock your podium before the first match for the full value.",
+  pre: "Window 1 is open — lock in your podium before the first match.",
   group: "Group stage in progress — podium picks are locked until the groups finish.",
-  post: "Window 2 is open — revise once if you like. A changed pick scores the lower value.",
+  post: "Window 2 is open — revise once if you like.",
   locked: "Podium picks are locked.",
 };
 

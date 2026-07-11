@@ -121,7 +121,7 @@ export function SetupWizard({
             Who lifts the trophy?
           </h2>
           <p className="t-sm" style={{ color: "var(--text-2)", marginBottom: 14 }}>
-            Your champion — worth the most points if you lock it early.
+            Your champion — one of your biggest-points calls.
           </p>
           <div
             className="grid gap-2"

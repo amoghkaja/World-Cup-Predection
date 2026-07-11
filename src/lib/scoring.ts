@@ -32,13 +32,17 @@ export const EXACT_BONUS: Record<MatchStage, number> = {
   final: 6,
 };
 
-// Podium (top-3) per-position value. EARLY = set before the group stage and left unchanged;
-// LATE = revised in the post-group window. Index 0 = 1st, 1 = 2nd, 2 = 3rd.
-export const PODIUM_EARLY = [15, 12, 10];
-export const PODIUM_LATE = [12, 10, 8];
+// Podium (top-3) per-position value — a correct champion / runner-up / third-place
+// call. Flat 50 each: these are hard, pre-tournament long-shots and they settle
+// only at the very end (Final + 3rd-place game), so they carry real weight in the
+// finish. The EARLY/LATE split (a small edge for committing before the group stage
+// vs. revising after) is currently OFF — both are 50 — so revising costs nothing.
+// Index 0 = 1st, 1 = 2nd, 2 = 3rd.
+export const PODIUM_EARLY = [50, 50, 50];
+export const PODIUM_LATE = [50, 50, 50];
 
 export const GROUP_QUALIFIER_POINTS = 4; // per correct team (winner / runner-up)
-export const GOLDEN_BOOT_POINTS = 15;
+export const GOLDEN_BOOT_POINTS = 50; // correct top-scorer nation (pre-tournament long-shot)
 
 /** The actual result of a finished match from the home team's perspective. */
 export function actualOutcome(home: number, away: number): PredOutcome {

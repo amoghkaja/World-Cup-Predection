@@ -332,8 +332,9 @@ export default function ScoringPage() {
       <div className="mb-3">
         <h2 className="t-h2">Group &amp; tournament bonuses</h2>
         <p className="t-sm" style={{ color: "var(--text-3)", marginTop: 3 }}>
-          One-off bets that pay big if you read the tournament right. Podium picks earn the higher
-          value when locked before the group stage — revise after groups for a little less.
+          One-off calls that pay big if you read the tournament right. The podium and Golden Boot
+          settle only at the very end, so a good pre-tournament read is a real swing on the final
+          leaderboard.
         </p>
       </div>
       <div className="card mb-6" style={{ overflow: "hidden" }}>
