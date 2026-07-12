@@ -86,50 +86,75 @@ export function MatchRow({
   const inPlay = !ended && (m.status === "live" || (locked && m.status === "scheduled"));
   const [editing, setEditing] = useState(false);
 
+  // Broadcast team line: flag · CODE · full name (muted, ellipsized)
   const teamLine = (t: FeedTeam | null, ph: string | null) => (
-    <span className="flex items-center min-w-0" style={{ gap: 8 }}>
-      <Flag flag={t?.flag} name={t?.name} size="sm" />
+    <span className="flex items-center min-w-0" style={{ gap: 10, padding: "3px 0" }}>
+      <Flag flag={t?.flag} name={t?.name} />
       <span
-        className="truncate"
+        className="tnum"
         style={{
-          fontWeight: 600,
-          fontSize: 14.5,
+          fontFamily: "var(--font-display)",
+          fontWeight: 800,
+          fontSize: 14,
+          letterSpacing: "0.02em",
+          width: 40,
+          flex: "none",
           color: t ? "var(--text)" : "var(--text-3)",
         }}
+      >
+        {t?.code ?? "—"}
+      </span>
+      <span
+        className="truncate hidden min-[400px]:inline"
+        style={{ fontSize: 13, color: t ? "var(--text-2)" : "var(--text-3)" }}
       >
         {t?.name ?? ph ?? "TBD"}
       </span>
     </span>
   );
 
-  // Right-hand status: your pick / call to pick / locked.
-  let right: React.ReactNode;
+  // Meta column (right-aligned): state pill + your pick.
+  let statusLine: React.ReactNode;
+  if (inPlay) {
+    statusLine = (
+      <span className="pill pill-live">
+        <span className="dot-live" />
+        Live
+      </span>
+    );
+  } else if (ended) {
+    statusLine = <span className="pill pill-locked">Ended</span>;
+  } else if (open) {
+    statusLine = (
+      <span className="tnum" style={{ fontWeight: 800, fontSize: 13.5, fontFamily: "var(--font-display)" }}>
+        <LocalKickoff iso={m.kickoff} tz={tz} />
+      </span>
+    );
+  } else {
+    statusLine = <span className="pill pill-locked">Locked</span>;
+  }
+
+  let pickLine: React.ReactNode;
   if (pick) {
-    right = (
-      <span
-        className="pill tnum"
-        style={{
-          background: open ? "var(--brand-soft)" : "var(--surface-2)",
-          color: open ? "var(--brand-strong)" : "var(--text-2)",
-          fontSize: 12.5,
-          padding: "5px 10px",
-        }}
-      >
+    pickLine = (
+      <span className={`pill tnum ${open ? "pill-acc" : "pill-locked"}`}>
         {pick.h}–{pick.a}
       </span>
     );
   } else if (open) {
-    right = (
-      <span
-        className="t-sm inline-flex items-center"
-        style={{ color: "var(--brand-strong)", fontWeight: 700, gap: 3 }}
-      >
+    pickLine = (
+      <span className="pill pill-open inline-flex items-center" style={{ gap: 3 }}>
         Pick
-        <Icon name="chevD" size={15} sw={2.4} style={{ transform: editing ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+        <Icon
+          name="chevD"
+          size={12}
+          sw={2.6}
+          style={{ transform: editing ? "rotate(180deg)" : "none", transition: "transform .18s ease" }}
+        />
       </span>
     );
   } else {
-    right = <Icon name="lock" size={15} style={{ color: "var(--text-3)" }} />;
+    pickLine = <Icon name="lock" size={14} style={{ color: "var(--text-3)" }} />;
   }
 
   return (
@@ -138,49 +163,36 @@ export function MatchRow({
         type="button"
         onClick={() => setEditing((e) => !e)}
         aria-expanded={editing}
-        className="w-full flex items-center text-left press"
+        className="w-full flex items-center text-left rowh press"
         style={{
-          gap: 12,
-          padding: "11px 14px",
+          gap: 14,
+          padding: "10px 14px",
           background: "transparent",
           border: "none",
           cursor: "pointer",
           minHeight: 64,
         }}
       >
-        {/* kickoff time */}
-        <span className="flex flex-col items-center" style={{ width: 56, flex: "none", gap: 2 }}>
-          {inPlay ? (
-            <span className="pill pill-live" style={{ fontSize: 10 }}>
-              <span className="dot-live" />
-              LIVE
-            </span>
-          ) : ended ? (
-            <span className="pill pill-locked" style={{ fontSize: 10 }}>
-              Ended
-            </span>
-          ) : (
-            <span className="tnum" style={{ fontWeight: 700, fontSize: 13 }}>
-              <LocalKickoff iso={m.kickoff} tz={tz} />
-            </span>
-          )}
-          <span className="t-xs" style={{ color: "var(--text-3)", fontSize: 10.5 }}>
-            {stageTag(m)}
-          </span>
-        </span>
-
         {/* teams */}
-        <span className="flex flex-col flex-1 min-w-0" style={{ gap: 5 }}>
+        <span className="flex flex-col flex-1 min-w-0">
           {teamLine(m.home, m.homePh)}
           {teamLine(m.away, m.awayPh)}
         </span>
 
-        {/* pick / state */}
-        <span className="flex items-center" style={{ gap: 8, flex: "none" }}>
-          {jokerOnMatch && (
-            <Icon name="star" size={15} sw={2} style={{ color: "var(--gold-strong)" }} aria-label="Joker" />
-          )}
-          {right}
+        {/* meta column */}
+        <span className="flex flex-col items-end" style={{ gap: 5, flex: "none", minWidth: 76 }}>
+          <span className="flex items-center" style={{ gap: 6 }}>
+            {jokerOnMatch && (
+              <Icon name="star" size={14} sw={2} style={{ color: "var(--gold-strong)" }} aria-label="Joker" />
+            )}
+            {statusLine}
+          </span>
+          <span className="flex items-center" style={{ gap: 6 }}>
+            <span className="t-xs" style={{ color: "var(--text-3)", fontSize: 10.5 }}>
+              {stageTag(m)}
+            </span>
+            {pickLine}
+          </span>
         </span>
       </button>
 

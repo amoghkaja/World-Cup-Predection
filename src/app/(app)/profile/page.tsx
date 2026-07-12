@@ -109,7 +109,7 @@ export default async function ProfilePage() {
           <Link
             key={l.href}
             href={l.href}
-            className="flex items-center gap-3.5"
+            className="flex items-center gap-3.5 rowh press"
             style={{
               padding: "15px 18px",
               borderTop: i ? "1px solid var(--line)" : "none",

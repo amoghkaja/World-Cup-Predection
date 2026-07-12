@@ -42,7 +42,7 @@ export function Countdown({
   className,
 }: {
   kickoff: string;
-  variant?: "inline" | "big" | "labeled";
+  variant?: "inline" | "big" | "labeled" | "bare";
   lockLabel?: string;
   className?: string;
 }) {
@@ -102,12 +102,22 @@ export function Countdown({
     );
   }
 
-  const color = locked ? "var(--text-3)" : s < 3600 ? "var(--bad)" : "var(--text-2)";
   let txt: string;
   if (locked) txt = "Locked";
   else if (d > 0) txt = `${d}d ${h}h`;
   else if (h > 0) txt = `${h}h ${m}m`;
   else txt = `${m}m ${String(sec).padStart(2, "0")}s`;
+
+  // bare: just the ticking value, color inherited (navy featured card, pills)
+  if (variant === "bare") {
+    return (
+      <span className={`tnum ${className ?? ""}`} suppressHydrationWarning style={{ fontWeight: 800 }}>
+        {txt}
+      </span>
+    );
+  }
+
+  const color = locked ? "var(--text-3)" : s < 3600 ? "var(--bad)" : "var(--text-2)";
 
   return (
     <span

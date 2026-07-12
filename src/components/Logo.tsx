@@ -1,49 +1,36 @@
-import Image from "next/image";
+// Broadcast brand elements: the tricolor rule (host trio — red/blue/green)
+// and the "PICK'EM '26" wordmark.
 
-// Brand mark: trophy + a two-line typographic lockup.
-export function Logo({ compact = false }: { compact?: boolean }) {
+export function Trico({ wide, style }: { wide?: boolean; style?: React.CSSProperties }) {
   return (
-    <span className="inline-flex items-center" style={{ gap: 9 }}>
-      <Image
-        src="/wc26-trophy.webp"
-        alt=""
-        width={24}
-        height={28}
-        priority
-        style={{ height: 27, width: "auto" }}
-      />
-      {!compact && (
-        <span className="flex flex-col" style={{ gap: 1 }}>
-          <span
-            style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 700,
-              fontStretch: "112%",
-              fontSize: 9.5,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              lineHeight: 1,
-              color: "var(--text-3)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            World Cup
-          </span>
-          <span
-            style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 800,
-              fontStretch: "110%",
-              fontSize: 15.5,
-              letterSpacing: "-0.01em",
-              lineHeight: 1,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Pick&rsquo;em <span style={{ color: "var(--brand)" }}>26</span>
-          </span>
-        </span>
-      )}
+    <span
+      aria-hidden
+      className="trirule"
+      style={{ width: wide ? "100%" : 44, flex: "none", ...style }}
+    />
+  );
+}
+
+// Wordmark: Archivo 800 uppercase, "'26" in accent (gold on navy), tricolor rule.
+export function Logo({
+  compact = false,
+  light = false,
+  size = 16,
+}: {
+  compact?: boolean;
+  light?: boolean;
+  size?: number;
+}) {
+  return (
+    <span className="inline-flex items-center" style={{ gap: 8 }}>
+      <span
+        className="td"
+        style={{ fontSize: size, color: light ? "var(--on-navy)" : "var(--text)", whiteSpace: "nowrap" }}
+      >
+        Pick&rsquo;em{" "}
+        <span style={{ color: light ? "var(--gold)" : "var(--brand)" }}>&rsquo;26</span>
+      </span>
+      {!compact && <Trico />}
     </span>
   );
 }

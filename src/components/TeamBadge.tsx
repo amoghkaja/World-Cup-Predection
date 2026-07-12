@@ -23,7 +23,7 @@ export function Flag({
 }: {
   flag?: string | null;
   name?: string;
-  size?: "sm" | "lg" | "";
+  size?: "sm" | "lg" | "xl" | "";
 }) {
   const iso = flag ? emojiToIso(flag) : null;
   let inner: React.ReactNode;

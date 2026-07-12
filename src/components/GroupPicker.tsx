@@ -91,28 +91,10 @@ export function GroupPicker({
       className="card overflow-hidden"
       style={{ padding: 0, borderColor: complete ? "var(--brand-ring)" : "var(--line)" }}
     >
-      <div
-        className="flex items-center justify-between px-4 py-3"
-        style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--line)" }}
-      >
-        <div className="flex items-center gap-2.5">
-          <span
-            className="grid place-items-center"
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 9,
-              background: "var(--brand)",
-              color: "var(--on-brand)",
-              fontFamily: "var(--font-display)",
-              fontWeight: 800,
-              fontSize: 15,
-            }}
-          >
-            {group}
-          </span>
-          <span className="t-h3">Group {group}</span>
-        </div>
+      <div className="card-h">
+        <span className="td" style={{ fontSize: 14 }}>
+          Group {group}
+        </span>
         {pending ? (
           <span className="pill pill-locked">Saving…</span>
         ) : existing?.scored ? (
@@ -132,33 +114,37 @@ export function GroupPicker({
         )}
       </div>
 
-      <div style={{ padding: "10px 10px 12px" }}>
-        <p className="t-xs" style={{ color: "var(--text-3)", padding: "0 4px 8px" }}>
-          Tap <b style={{ color: "var(--gold-strong)" }}>1st</b> for the group winner and{" "}
-          <b style={{ color: "var(--brand-strong)" }}>2nd</b> for the runner-up. Saves automatically.
-        </p>
-
-        {teams.map((t) => {
+      <div>
+        {teams.map((t, i) => {
           const isFirst = winner === t.id;
           const isSecond = runnerup === t.id;
           return (
             <div
               key={t.id}
-              className="grid items-center"
+              className="grid items-center rowh"
               style={{
-                gridTemplateColumns: "1fr 56px 56px",
-                gap: 6,
-                padding: "3px 6px",
-                borderRadius: 10,
+                gridTemplateColumns: "27px 38px 1fr 50px 50px",
+                gap: 10,
+                padding: "8px 14px",
+                borderTop: i ? "1px solid var(--line)" : "none",
                 background: isFirst || isSecond ? "var(--brand-soft)" : "transparent",
+                transition: "background .18s ease",
               }}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Flag flag={t.flag_emoji} name={t.name} size="sm" />
-                <span className="truncate" style={{ fontWeight: 700, fontSize: 14 }}>
-                  {t.name}
-                </span>
-              </div>
+              <Flag flag={t.flag_emoji} name={t.name} />
+              <span
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 800,
+                  fontSize: 13.5,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {t.code}
+              </span>
+              <span className="truncate t-sm" style={{ color: "var(--text-2)" }}>
+                {t.name}
+              </span>
               <PosToggle label="1st" on={isFirst} gold disabled={locked || pending} onClick={() => toggle("first", t.id)} />
               <PosToggle label="2nd" on={isSecond} disabled={locked || pending} onClick={() => toggle("second", t.id)} />
             </div>
@@ -223,6 +209,7 @@ function PosToggle({
   disabled?: boolean;
   onClick: () => void;
 }) {
+  // Broadcast group tags: 1st = solid green, 2nd = accent-soft w/ accent ring.
   return (
     <button
       type="button"
@@ -230,20 +217,29 @@ function PosToggle({
       aria-pressed={on}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex items-center justify-center gap-1"
+      className="inline-flex items-center justify-center press"
       style={{
-        height: 42,
-        borderRadius: 10,
-        border: on ? "none" : "1.5px solid var(--line-strong)",
-        background: on ? (gold ? "var(--gold)" : "var(--brand)") : "transparent",
-        color: on ? (gold ? "var(--on-gold)" : "var(--on-brand)") : "var(--text-3)",
+        gap: 3,
+        height: 36,
+        borderRadius: 8,
+        border: "none",
+        boxShadow: on
+          ? gold
+            ? "none"
+            : "inset 0 0 0 1px var(--brand)"
+          : "inset 0 0 0 1px var(--line-strong)",
+        background: on ? (gold ? "var(--green)" : "var(--brand-soft)") : "transparent",
+        color: on ? (gold ? "var(--on-good)" : "var(--brand-strong)") : "var(--text-3)",
+        fontFamily: "var(--font-display)",
         fontWeight: 800,
-        fontSize: 12.5,
+        fontSize: 11,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
         cursor: disabled ? "not-allowed" : "pointer",
-        transition: "all .15s",
+        transition: "background .15s ease, color .15s ease, box-shadow .15s ease",
       }}
     >
-      {on && <Icon name="check" size={13} sw={3} />}
+      {on && <Icon name="check" size={12} sw={3} />}
       {label}
     </button>
   );

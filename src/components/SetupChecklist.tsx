@@ -59,7 +59,7 @@ export function SetupChecklist({
             <Link
               key={it.label}
               href={it.href}
-              className="flex items-center gap-3"
+              className="flex items-center gap-3 lift press"
               style={{
                 padding: "10px 12px",
                 borderRadius: 12,
@@ -75,7 +75,7 @@ export function SetupChecklist({
                   borderRadius: 9,
                   flex: "none",
                   background: it.done ? "var(--good)" : "var(--surface)",
-                  color: it.done ? "#fff" : "var(--text-3)",
+                  color: it.done ? "var(--on-good)" : "var(--text-3)",
                 }}
               >
                 <Icon name={it.done ? "check" : it.icon} size={17} sw={it.done ? 3 : 2} />

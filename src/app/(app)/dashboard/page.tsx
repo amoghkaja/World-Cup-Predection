@@ -24,6 +24,17 @@ import { Icon } from "@/components/Icon";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { StreakTracker } from "@/components/StreakTracker";
 import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
+import { FeaturedMatch } from "@/components/FeaturedMatch";
+import { DashboardRail } from "@/components/DashboardRail";
+
+const STAGE_LABEL: Record<string, string> = {
+  r32: "Round of 32",
+  r16: "Round of 16",
+  qf: "Quarterfinal",
+  sf: "Semifinal",
+  third: "Third place",
+  final: "The Final",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -142,6 +153,19 @@ export default async function DashboardPage() {
       };
     });
 
+  // Featured card: the next open match still missing a pick (or, all picked,
+  // simply the next kickoff).
+  const nextUp =
+    [...unpicked].sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))[0] ??
+    [...openMatches].sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))[0] ??
+    null;
+
+  // Right rail: your last 5 settled picks, oldest → newest (recap is newest-first).
+  const form = recap
+    .slice(0, 5)
+    .map((e) => e.pts > 0)
+    .reverse();
+
   const my = board.find((r) => r.user_id === profile?.id);
   const stats: { value: string; label: string; gold?: boolean; flame?: boolean }[] = [
     { value: my ? `#${my.rank}` : "—", label: "Rank" },
@@ -151,7 +175,8 @@ export default async function DashboardPage() {
   if (streak > 0) stats.push({ value: String(streak), label: "Streak", gold: true, flame: true });
 
   return (
-    <div className="flex flex-col" style={{ gap: 16 }}>
+    <div className="xl:grid xl:grid-cols-[1fr_320px] xl:gap-6 xl:items-start">
+      <div className="flex flex-col" style={{ gap: 16 }}>
       <PointsRecap
         entries={recap}
         totalPoints={my?.total_points ?? 0}
@@ -284,6 +309,41 @@ export default async function DashboardPage() {
             </div>
           )}
 
+          {/* featured: your next pick, broadcast navy card */}
+          {nextUp && (
+            <FeaturedMatch
+              id={nextUp.id}
+              stageLabel={
+                nextUp.stage === "group"
+                  ? `Group ${nextUp.group_label ?? ""}`
+                  : STAGE_LABEL[nextUp.stage] ?? nextUp.stage.toUpperCase()
+              }
+              kickoff={nextUp.kickoff_at}
+              tz={tz}
+              home={
+                nextUp.home_team
+                  ? {
+                      name: nextUp.home_team.name,
+                      code: nextUp.home_team.code,
+                      flag: nextUp.home_team.flag_emoji,
+                    }
+                  : null
+              }
+              away={
+                nextUp.away_team
+                  ? {
+                      name: nextUp.away_team.name,
+                      code: nextUp.away_team.code,
+                      flag: nextUp.away_team.flag_emoji,
+                    }
+                  : null
+              }
+              homePh={nextUp.home_placeholder}
+              awayPh={nextUp.away_placeholder}
+              picked={preds.has(nextUp.id)}
+            />
+          )}
+
           {/* filterable, day-grouped match list (upcoming + live only) */}
           <DashboardMatchList
             matches={feed}
@@ -330,6 +390,17 @@ export default async function DashboardPage() {
           )}
         </>
       )}
+      </div>
+
+      {/* desktop right rail */}
+      <aside className="hidden xl:block" style={{ position: "sticky", top: 76 }}>
+        <DashboardRail
+          top={board.slice(0, 5)}
+          myId={profile?.id ?? null}
+          form={form}
+          streak={streak}
+        />
+      </aside>
     </div>
   );
 }

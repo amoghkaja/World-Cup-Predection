@@ -50,3 +50,6 @@ next-env.d.ts
 
 # design handoff source archive (keep extracted folder, not the zip)
 docs/*.zip
+
+# design handoff archives
+World Cup.zip

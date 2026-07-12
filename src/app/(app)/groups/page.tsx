@@ -34,16 +34,16 @@ export default async function GroupsPage() {
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="t-h1">Group predictions</h1>
-          <p className="t-sm" style={{ color: "var(--text-3)", marginTop: 4 }}>
+          <h1 className="t-h1">Group stage picks</h1>
+          <p className="t-sm" style={{ color: "var(--text-2)", marginTop: 4 }}>
             Tap who finishes 1st and 2nd in every group — picks save automatically. Correct winner ={" "}
             {GROUP_QUALIFIER_POINTS} pts, runner-up = {GROUP_QUALIFIER_POINTS} pts.
             {locked ? " Locked at first kickoff." : ""}
           </p>
         </div>
-        <span className="chip">
-          <Icon name="grid" size={14} style={{ color: "var(--brand)" }} />
-          {done}/{total} set
+        <span className="pill pill-acc" style={{ padding: "6px 12px" }}>
+          <Icon name="grid" size={13} />
+          {done} / {total} done
         </span>
       </header>
 
@@ -68,15 +68,16 @@ export default async function GroupsPage() {
         />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-3.5">
-        {groups.map((g) => (
-          <GroupPicker
-            key={g}
-            group={g}
-            teams={byGroup.get(g)!}
-            existing={preds.get(g) ?? null}
-            locked={locked}
-          />
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
+        {groups.map((g, i) => (
+          <div key={g} style={{ ["--i" as string]: Math.min(i, 8) }}>
+            <GroupPicker
+              group={g}
+              teams={byGroup.get(g)!}
+              existing={preds.get(g) ?? null}
+              locked={locked}
+            />
+          </div>
         ))}
       </div>
     </div>

@@ -37,16 +37,19 @@ export function BracketNode({
     const won = done && match.winner_team_id != null && team?.id === match.winner_team_id;
     return (
       <div
-        className="flex items-center gap-2 px-3 py-2.5"
+        className="flex items-center px-3"
         style={{
+          gap: 8,
+          padding: "8px 12px",
           borderTop: isTop ? "none" : "1px solid var(--line)",
           background: won ? "var(--brand-soft)" : "transparent",
+          boxShadow: won ? "inset 2px 0 0 var(--brand)" : "none",
         }}
       >
         {empty ? (
           <span
             className="flag sm"
-            style={{ background: "var(--surface-2)", color: "var(--text-3)", fontSize: 11 }}
+            style={{ background: "var(--surface-2)", color: "var(--text-3)", fontSize: 10 }}
           >
             ?
           </span>
@@ -56,15 +59,19 @@ export function BracketNode({
         <span
           className="truncate flex-1"
           style={{
-            fontWeight: won ? 800 : 700,
-            fontSize: 13.5,
-            color: empty ? "var(--text-3)" : "var(--text)",
+            fontFamily: "var(--font-display)",
+            fontWeight: empty ? 600 : 750,
+            fontSize: 12.5,
+            color: empty ? "var(--text-3)" : won ? "var(--brand-strong)" : "var(--text)",
           }}
         >
           {team ? team.name : (placeholder ?? "TBD")}
         </span>
         {done && score != null && (
-          <span className="tnum" style={{ fontWeight: 800, fontSize: 14 }}>
+          <span
+            className="tnum"
+            style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 14 }}
+          >
             {score}
           </span>
         )}

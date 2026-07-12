@@ -37,7 +37,7 @@ export function LeaderboardRow({
   return (
     <Link
       href={me ? "/predictions" : `/u/${row.user_id}`}
-      className="flex items-center gap-3 press"
+      className={`flex items-center gap-3 press ${me ? "" : "rowh"}`}
       style={{
         padding: "11px 14px",
         background: me ? "var(--brand-soft)" : "transparent",
@@ -98,8 +98,22 @@ export function LeaderboardRow({
       </div>
       <Avatar name={row.display_name ?? "?"} src={row.avatar_url} size={38} />
       <div className="flex-1 min-w-0">
-        <div className="truncate" style={{ fontWeight: me ? 750 : 650, fontSize: 14.5 }}>
-          {me ? "You" : row.display_name ?? "Anonymous"}
+        <div className="truncate" style={{ fontWeight: me ? 800 : 650, fontSize: 14.5 }}>
+          {row.display_name ?? "Anonymous"}
+          {me && (
+            <span
+              className="t-xs"
+              style={{
+                color: "var(--brand-strong)",
+                marginLeft: 6,
+                fontFamily: "var(--font-display)",
+                fontWeight: 800,
+                letterSpacing: "0.06em",
+              }}
+            >
+              YOU
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           {streak >= 2 && (
@@ -130,12 +144,38 @@ export function LeaderboardRow({
           </span>
         </div>
       </div>
+      {/* desktop: animated accuracy bar */}
+      <span className="hidden md:inline-flex items-center" style={{ gap: 7, width: 110, flex: "none" }}>
+        <span
+          style={{
+            flex: 1,
+            height: 4,
+            borderRadius: 2,
+            background: "var(--surface-2)",
+            overflow: "hidden",
+          }}
+        >
+          <span
+            className="bar-anim"
+            style={{
+              display: "block",
+              height: "100%",
+              width: `${acc}%`,
+              background: "var(--brand)",
+              borderRadius: 2,
+            }}
+          />
+        </span>
+        <span className="t-xs tnum" style={{ color: "var(--text-2)", width: 32, textAlign: "right" }}>
+          {acc}%
+        </span>
+      </span>
+
       <div className="tnum" style={{ textAlign: "right" }}>
         <div
           style={{
             fontFamily: "var(--font-display)",
             fontWeight: 800,
-            fontStretch: "108%",
             fontSize: 18,
           }}
         >
