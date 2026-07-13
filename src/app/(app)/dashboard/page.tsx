@@ -26,15 +26,7 @@ import { StreakTracker } from "@/components/StreakTracker";
 import { PointsRecap, type RecapEntry } from "@/components/PointsRecap";
 import { FeaturedMatch } from "@/components/FeaturedMatch";
 import { DashboardRail } from "@/components/DashboardRail";
-
-const STAGE_LABEL: Record<string, string> = {
-  r32: "Round of 32",
-  r16: "Round of 16",
-  qf: "Quarterfinal",
-  sf: "Semifinal",
-  third: "Third place",
-  final: "The Final",
-};
+import { STAGE_LABELS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -316,7 +308,7 @@ export default async function DashboardPage() {
               stageLabel={
                 nextUp.stage === "group"
                   ? `Group ${nextUp.group_label ?? ""}`
-                  : STAGE_LABEL[nextUp.stage] ?? nextUp.stage.toUpperCase()
+                  : STAGE_LABELS[nextUp.stage]
               }
               kickoff={nextUp.kickoff_at}
               tz={tz}

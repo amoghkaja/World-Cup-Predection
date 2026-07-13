@@ -249,7 +249,7 @@ h1, h2, h3, h4 {
   .pill-locked { background: var(--surface-2); color: var(--text-3); border: 1px solid var(--line); }
   .pill-live { background: var(--red); color: var(--on-bad); }
   .pill-live .dot-live { background: currentColor; animation: blink 1.2s infinite; }
-  .pill-done { background: var(--good-soft); color: var(--good-strong, var(--green-strong)); }
+  .pill-done { background: var(--good-soft); color: var(--green-strong); }
   .pill-pts { background: var(--gold-soft); color: var(--gold-strong); }
   .pill-acc { background: var(--brand-soft); color: var(--brand-strong); }
 
@@ -368,16 +368,19 @@ h1, h2, h3, h4 {
 @keyframes barfill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes riseup { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-.anim-up { animation: slideup .22s ease-out both; }
-.anim-fade { animation: fadein .18s ease both; }
-.anim-pop { animation: popin .18s ease-out both; }
-.anim-rise { animation: riseup .34s cubic-bezier(.2,.8,.3,1) both; }
+/* Entrance animations use fill-mode `backwards`, never `both`/`forwards`:
+   a retained transform would turn the wrapper into the containing block for
+   position:fixed children (toasts, modals) and break their placement. */
+.anim-up { animation: slideup .22s ease-out backwards; }
+.anim-fade { animation: fadein .18s ease backwards; }
+.anim-pop { animation: popin .18s ease-out backwards; }
+.anim-rise { animation: riseup .34s cubic-bezier(.2,.8,.3,1) backwards; }
 
 /* staggered entrances: set --i per child (capped by markup, not CSS) */
-.stagger > * { animation: riseup .34s cubic-bezier(.2,.8,.3,1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.stagger > * { animation: riseup .34s cubic-bezier(.2,.8,.3,1) backwards; animation-delay: calc(var(--i, 0) * 45ms); }
 
 /* growing bars (accuracy, progress) */
-.bar-anim { transform-origin: left; animation: barfill .5s cubic-bezier(.2,.8,.3,1) both; }
+.bar-anim { transform-origin: left; animation: barfill .5s cubic-bezier(.2,.8,.3,1) backwards; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
