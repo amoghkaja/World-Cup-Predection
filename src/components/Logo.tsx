@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 // Broadcast brand elements: the tricolor rule (host trio — red/blue/green)
-// and the wordmark, anchored by the World Cup 26 trophy mark.
+// and the wordmark, anchored by the official WC26 mark.
 
 export function Trico({ wide, style }: { wide?: boolean; style?: React.CSSProperties }) {
   return (
@@ -13,7 +13,10 @@ export function Trico({ wide, style }: { wide?: boolean; style?: React.CSSProper
   );
 }
 
-// Trophy + "PICK'EM '26" (Archivo 800 uppercase, "'26" in accent) + tricolor rule.
+// Official mark + "PICK'EM '26" (Archivo 800 uppercase, "'26" in accent) +
+// tricolor rule. The mark is theme-swapped so its tile always contrasts with
+// the bar behind it: dark-background emblem on light surfaces, white-tile
+// trophy on dark ones.
 export function Logo({
   compact = false,
   light = false,
@@ -23,15 +26,26 @@ export function Logo({
   light?: boolean;
   size?: number;
 }) {
+  const markStyle: React.CSSProperties = { height: size * 1.7, width: "auto", flex: "none" };
   return (
     <span className="inline-flex items-center" style={{ gap: 8 }}>
       <Image
+        src="/wc26-emblem.webp"
+        alt=""
+        width={960}
+        height={1482}
+        priority
+        className="only-light"
+        style={markStyle}
+      />
+      <Image
         src="/wc26-trophy.webp"
         alt=""
-        width={24}
-        height={28}
+        width={560}
+        height={660}
         priority
-        style={{ height: size * 1.6, width: "auto", flex: "none" }}
+        className="only-dark"
+        style={markStyle}
       />
       <span
         className="td"
