@@ -33,15 +33,25 @@ function HeroPanel() {
       >
         26
       </span>
-      {/* official WC26 mark — dark variant sits on the navy hero in both themes */}
+      {/* official WC26 mark — the sharper dark-background emblem in light mode,
+          the original variant in dark mode */}
+      <Image
+        src="/wc26-emblem.webp"
+        alt="FIFA World Cup 2026"
+        width={960}
+        height={1482}
+        priority
+        className="absolute anim-pop only-light"
+        style={{ top: 26, left: 26, width: "min(19vw, 104px)", height: "auto", zIndex: 3 }}
+      />
       <Image
         src="/wc26-logo-dark.webp"
         alt="FIFA World Cup 2026"
         width={124}
         height={192}
         priority
-        className="absolute anim-pop"
-        style={{ top: 26, left: 26, width: "min(19vw, 108px)", height: "auto", zIndex: 3 }}
+        className="absolute anim-pop only-dark"
+        style={{ top: 26, left: 26, width: "min(19vw, 104px)", height: "auto", zIndex: 3 }}
       />
       <div
         aria-hidden

@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
-  getCurrentUser,
   getLeaderboard,
   getMatches,
   getTeams,
@@ -48,8 +47,10 @@ const PODIUM_LABELS: { position: number; label: string }[] = [
 
 export default async function UserPicksPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const me = await getCurrentUser();
-  if (me?.id === id) redirect("/predictions");
+  // Viewing yourself renders the same public picks page as any other player —
+  // the leaderboard should read consistently no matter whose row you tap.
+  // (Your editable list still lives at /predictions, linked from the app bar
+  // and profile.)
 
   const supabase = await createClient();
   // RLS hides other users' tournament/group/podium picks until their lock

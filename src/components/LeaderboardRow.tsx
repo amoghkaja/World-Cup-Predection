@@ -36,7 +36,7 @@ export function LeaderboardRow({
 
   return (
     <Link
-      href={me ? "/predictions" : `/u/${row.user_id}`}
+      href={`/u/${row.user_id}`}
       className={`flex items-center gap-3 press ${me ? "" : "rowh"}`}
       style={{
         padding: "11px 14px",

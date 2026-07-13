@@ -226,6 +226,16 @@
   --font-sans: var(--font-body);
 }
 
+/* theme-scoped visibility — same resolution rules as the tokens above
+   (explicit data-theme choice wins, otherwise the system preference) */
+.only-dark { display: none; }
+:root[data-theme="dark"] .only-dark { display: block; }
+:root[data-theme="dark"] .only-light { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .only-dark { display: block; }
+  :root:not([data-theme="light"]) .only-light { display: none; }
+}
+
 * { box-sizing: border-box; border-color: var(--line); }
 
 html { height: 100%; -webkit-tap-highlight-color: transparent; }
