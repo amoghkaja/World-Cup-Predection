@@ -71,9 +71,9 @@ export default async function LeaderboardPage() {
               Scaredy-cat standings
             </div>
             <div className="t-sm" style={{ color: "var(--text-2)", marginTop: 2 }}>
-              Side-bet &amp; joker points hidden. This is <strong>not</strong> the real leaderboard —
-              it&rsquo;s a comfort view for players too scared to place a bet and take a risk. The real
-              board counts every gamble.
+              {"Side-bet and joker points are hidden. This is "}
+              <strong>not</strong>
+              {" the real leaderboard — it’s a comfort view for players too scared to place a bet. The real board counts every gamble."}
             </div>
           </div>
         </div>
