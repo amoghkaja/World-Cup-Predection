@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getMatch } from "@/lib/queries";
 import { isLocked } from "@/lib/format";
-import { actualOutcome } from "@/lib/scoring";
+import { actualOutcome, featuresLive } from "@/lib/scoring";
 import type { PredOutcome } from "@/lib/types";
 import {
   type Result,
@@ -20,7 +20,10 @@ export async function savePrediction(input: {
   outcome: PredOutcome;
   homeScore: number;
   awayScore: number;
-}): Promise<Result> {
+  /** also play the day's joker on this match (staged while picking) —
+      saved right after the prediction so the RPC's pick-exists check passes */
+  joker?: boolean;
+}): Promise<Result & { jokerError?: string }> {
   try {
     const { supabase, userId } = await requireUser();
 
@@ -64,9 +67,23 @@ export async function savePrediction(input: {
       return { ok: false, error: error.message };
     }
 
+    // Staged joker rides along with the pick. The prediction is already saved,
+    // so a joker failure is reported separately rather than failing the save.
+    let jokerError: string | undefined;
+    if (input.joker) {
+      if (!featuresLive()) {
+        jokerError = "The joker isn't live yet.";
+      } else {
+        const { error: jokErr } = await supabase.rpc("save_joker", {
+          p_match_id: input.matchId,
+        });
+        if (jokErr) jokerError = jokErr.message;
+      }
+    }
+
     revalidatePath("/bracket");
     revalidateMatchSurfaces(input.matchId);
-    return { ok: true };
+    return { ok: true, jokerError };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

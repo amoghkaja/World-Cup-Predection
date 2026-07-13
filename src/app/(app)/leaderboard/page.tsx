@@ -6,74 +6,9 @@ import {
   applyNoGambleView,
 } from "@/lib/queries";
 import type { LeaderboardRow as LeaderboardRowData } from "@/lib/types";
-import { accuracyPct } from "@/lib/scoring";
 import { LeaderboardRow } from "@/components/LeaderboardRow";
 import { BoardViewToggle } from "@/components/BoardViewToggle";
-import { Avatar } from "@/components/Avatar";
 import { Trico } from "@/components/Logo";
-
-// Podium medal accents: gold / silver / bronze.
-const MEDAL = ["var(--gold)", "#b9c2cc", "#c9906b"];
-
-function PodiumCard({
-  row,
-  place,
-  me,
-}: {
-  row: LeaderboardRowData & { rank: number };
-  place: number;
-  me: boolean;
-}) {
-  return (
-    <div
-      className="card lift text-center"
-      style={{
-        flex: 1,
-        padding: 16,
-        borderTop: `3px solid ${MEDAL[place - 1]}`,
-        ["--i" as string]: place - 1,
-      }}
-    >
-      <div className="flex flex-col items-center" style={{ gap: 7 }}>
-        <div style={{ position: "relative" }}>
-          <Avatar
-            name={row.display_name}
-            src={row.avatar_url}
-            size={place === 1 ? 52 : 44}
-          />
-          <span
-            className="tnum grid place-items-center"
-            style={{
-              position: "absolute",
-              top: -6,
-              right: -10,
-              minWidth: 20,
-              height: 20,
-              borderRadius: 99,
-              background: MEDAL[place - 1],
-              color: place === 2 ? "#2c3238" : "#fff",
-              fontFamily: "var(--font-display)",
-              fontWeight: 800,
-              fontSize: 11,
-              boxShadow: "0 0 0 2px var(--surface)",
-            }}
-          >
-            {place}
-          </span>
-        </div>
-        <span className="t-sm truncate" style={{ fontWeight: 800, maxWidth: "100%" }}>
-          {me ? "You" : row.display_name ?? "Anonymous"}
-        </span>
-        <span className="tnum" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, lineHeight: 1 }}>
-          {row.total_points}
-        </span>
-        <span className="t-xs" style={{ color: "var(--text-3)" }}>
-          {accuracyPct(row)}% accuracy
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export const dynamic = "force-dynamic";
 
@@ -141,15 +76,6 @@ export default async function LeaderboardPage() {
               board counts every gamble.
             </div>
           </div>
-        </div>
-      )}
-
-      {/* podium — top three, broadcast style */}
-      {rows.length >= 3 && (
-        <div className="flex stagger" style={{ gap: 12, marginBottom: 14 }}>
-          {rows.slice(0, 3).map((r, i) => (
-            <PodiumCard key={r.user_id} row={r} place={i + 1} me={me(r)} />
-          ))}
         </div>
       )}
 

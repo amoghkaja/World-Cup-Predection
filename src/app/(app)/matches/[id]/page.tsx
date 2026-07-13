@@ -17,8 +17,8 @@ import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/TeamBadge";
 import { Countdown } from "@/components/Countdown";
 import { StatusPill } from "@/components/StatusPill";
-import { PredictionForm } from "@/components/PredictionForm";
-import { SideBetControls, type SideState } from "@/components/SideBetControls";
+import { PredictPanel } from "@/components/PredictPanel";
+import { type SideState } from "@/components/SideBetControls";
 
 export const dynamic = "force-dynamic";
 
@@ -221,21 +221,18 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               {open ? "Pick the outcome and exact score." : "This match is locked."}
             </span>
           </div>
-          <PredictionForm match={match} existing={existing} locked={!open} />
-          {open && (
-            <div style={{ borderTop: "1px dashed var(--line)", marginTop: 14, paddingTop: 10 }}>
-              <SideBetControls
-                matchId={match.id}
-                stage={match.stage}
-                side={sideState}
-                joker={jokerOnMatch}
-                jokerUsedElsewhere={jokerUsedElsewhere}
-                live={live}
-                unlockLabel={unlockLabel}
-                jokerUpside={maxPts}
-              />
-            </div>
-          )}
+          <PredictPanel
+            match={match}
+            existing={existing}
+            locked={!open}
+            showGambles={open}
+            side={sideState}
+            joker={jokerOnMatch}
+            jokerUsedElsewhere={jokerUsedElsewhere}
+            live={live}
+            unlockLabel={unlockLabel}
+            jokerUpside={maxPts}
+          />
         </div>
       )}
 

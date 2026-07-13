@@ -10,8 +10,8 @@ import { LocalKickoff } from "./LocalTime";
 import { Flag } from "./TeamBadge";
 import { Countdown } from "./Countdown";
 import { Segmented } from "./Segmented";
-import { PredictionForm } from "./PredictionForm";
-import { SideBetControls, type SideState } from "./SideBetControls";
+import { PredictPanel } from "./PredictPanel";
+import { type SideState } from "./SideBetControls";
 import { MatchPointsInfo } from "./MatchPointsInfo";
 
 /**
@@ -230,7 +230,7 @@ export function MatchRow({
               </Link>
             </span>
           </div>
-          <PredictionForm
+          <PredictPanel
             match={{
               id: m.id,
               stage: m.stage,
@@ -255,22 +255,14 @@ export function MatchRow({
             locked={!open}
             compact
             onSaved={() => setEditing(false)}
+            showGambles={open}
+            side={side}
+            joker={jokerOnMatch}
+            jokerUsedElsewhere={jokerUsedElsewhere}
+            live={live}
+            unlockLabel={unlockLabel}
+            jokerUpside={maxPointsForStage(m.stage)}
           />
-
-          {open && (
-            <div style={{ borderTop: "1px dashed var(--line)", paddingTop: 4 }}>
-              <SideBetControls
-                matchId={m.id}
-                stage={m.stage}
-                side={side}
-                joker={jokerOnMatch}
-                jokerUsedElsewhere={jokerUsedElsewhere}
-                live={live}
-                unlockLabel={unlockLabel}
-                jokerUpside={maxPointsForStage(m.stage)}
-              />
-            </div>
-          )}
         </div>
       )}
     </div>

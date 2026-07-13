@@ -35,6 +35,7 @@ export function PredictionForm({
   existing,
   locked,
   compact,
+  stagedJoker,
   onSaved,
 }: {
   match: PredictableMatch;
@@ -42,7 +43,9 @@ export function PredictionForm({
   locked: boolean;
   /** drawer (true) vs full match-detail surface (false) */
   compact?: boolean;
-  /** fired after a successful save (e.g. to collapse a drawer) */
+  /** play the day's joker together with this save (staged in PredictPanel) */
+  stagedJoker?: boolean;
+  /** fired after a fully successful save (e.g. to collapse a drawer) */
   onSaved?: () => void;
 }) {
   const teamsKnown = !!match.home_team && !!match.away_team;
@@ -92,12 +95,16 @@ export function PredictionForm({
         outcome,
         homeScore: home,
         awayScore: away,
+        joker: stagedJoker || undefined,
       });
-      if (res.ok) {
-        setMsg({ ok: true, text: "Prediction saved" });
-        onSaved?.();
-      } else {
+      if (!res.ok) {
         setMsg({ ok: false, text: res.error });
+      } else if (res.jokerError) {
+        // pick saved, joker didn't land — keep the panel open so this is seen
+        setMsg({ ok: false, text: `Prediction saved, but the joker wasn't played: ${res.jokerError}` });
+      } else {
+        setMsg({ ok: true, text: stagedJoker ? "Prediction saved · joker played" : "Prediction saved" });
+        onSaved?.();
       }
     });
   }
@@ -201,8 +208,14 @@ export function PredictionForm({
           onClick={submit}
           disabled={isPending || disabled}
         >
-          <Icon name="check" size={17} sw={2.6} />
-          {isPending ? "Saving…" : existing ? "Update prediction" : "Save prediction"}
+          <Icon name={stagedJoker ? "star" : "check"} size={17} sw={2.6} />
+          {isPending
+            ? "Saving…"
+            : stagedJoker
+              ? "Save pick & play joker"
+              : existing
+                ? "Update prediction"
+                : "Save prediction"}
         </button>
       )}
 

@@ -35,6 +35,9 @@ export function SideBetControls({
   live,
   unlockLabel,
   jokerUpside,
+  hasPick = true,
+  stagedJoker = false,
+  onStageJoker,
 }: {
   matchId: number;
   stage: MatchStage;
@@ -48,6 +51,11 @@ export function SideBetControls({
   unlockLabel?: string;
   /** max extra points the joker can add on this match (= its max main-pick haul) */
   jokerUpside?: number;
+  /** a saved prediction exists — without one the joker can only be STAGED
+      (it saves together with the pick; see PredictPanel) */
+  hasPick?: boolean;
+  stagedJoker?: boolean;
+  onStageJoker?: (v: boolean) => void;
 }) {
   const isKnockout = stage !== "group";
   const [picks, setPicks] = useState<Record<SideBetMarket, Pick>>({
@@ -110,7 +118,14 @@ export function SideBetControls({
     );
   }
   function toggleJoker() {
-    if (!live || (jokerUsedElsewhere && !jok)) return;
+    if (!live) return;
+    // No pick yet → stage it locally; it saves together with the prediction.
+    if (!hasPick && onStageJoker) {
+      if (jokerUsedElsewhere && !stagedJoker) return;
+      onStageJoker(!stagedJoker);
+      return;
+    }
+    if (jokerUsedElsewhere && !jok) return;
     const prev = jok;
     setJok(!jok);
     run(
@@ -118,6 +133,8 @@ export function SideBetControls({
       () => setJok(prev)
     );
   }
+  // what the joker button shows: a saved joker or a staged one
+  const jokOn = jok || stagedJoker;
 
   // BTTS is a two-sided Yes/No segmented control.
   const seg = (active: boolean): React.CSSProperties => ({
@@ -277,10 +294,10 @@ export function SideBetControls({
       {/* Joker */}
       <button
         type="button"
-        disabled={frozen || (jokerUsedElsewhere && !jok)}
+        disabled={frozen || (jokerUsedElsewhere && !jokOn)}
         onClick={toggleJoker}
         title={
-          jokerUsedElsewhere && !jok
+          jokerUsedElsewhere && !jokOn
             ? "One joker per day. Remove it on the other match to move it here."
             : undefined
         }
@@ -289,21 +306,23 @@ export function SideBetControls({
           gap: 10,
           padding: "10px 12px",
           borderRadius: 12,
-          border: `1px solid ${jok ? "var(--gold)" : "var(--line)"}`,
-          background: jok ? "var(--gold-soft)" : "var(--surface)",
-          cursor: !live || (jokerUsedElsewhere && !jok) ? "not-allowed" : "pointer",
-          opacity: !live || (jokerUsedElsewhere && !jok) ? 0.6 : 1,
+          border: `1px solid ${jokOn ? "var(--gold)" : "var(--line)"}`,
+          background: jokOn ? "var(--gold-soft)" : "var(--surface)",
+          cursor: !live || (jokerUsedElsewhere && !jokOn) ? "not-allowed" : "pointer",
+          opacity: !live || (jokerUsedElsewhere && !jokOn) ? 0.6 : 1,
         }}
       >
-        <Icon name="star" size={18} sw={2} style={{ color: jok ? "var(--gold-strong)" : "var(--text-3)" }} />
-        <span style={{ flex: 1, textAlign: "left", fontWeight: 700, fontSize: 13.5, color: jok ? "var(--on-gold)" : "var(--text)" }}>
-          {jok
-            ? "Joker on this match — doubles your pick"
-            : jokerUsedElsewhere
-              ? "Joker is on another match today"
-              : "Play your joker (doubles or penalises)"}
+        <Icon name="star" size={18} sw={2} style={{ color: jokOn ? "var(--gold-strong)" : "var(--text-3)" }} />
+        <span style={{ flex: 1, textAlign: "left", fontWeight: 700, fontSize: 13.5, color: jokOn ? "var(--on-gold)" : "var(--text)" }}>
+          {stagedJoker
+            ? "Joker staged — plays when you save your pick"
+            : jok
+              ? "Joker on this match — doubles your pick"
+              : jokerUsedElsewhere
+                ? "Joker is on another match today"
+                : "Play your joker (doubles or penalises)"}
         </span>
-        {jokerUsedElsewhere && !jok && (
+        {jokerUsedElsewhere && !jokOn && (
           <span className="t-xs" style={{ color: "var(--text-3)", textAlign: "right", maxWidth: 92 }}>
             remove it there to move
           </span>
