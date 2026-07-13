@@ -13,10 +13,11 @@ export function Trico({ wide, style }: { wide?: boolean; style?: React.CSSProper
   );
 }
 
-// Official mark + "WORLD CUP PICK'EM '26" (Archivo 800 uppercase, "'26" in
-// accent) + tricolor rule. The mark is theme-swapped so its tile always
-// contrasts with the bar behind it: dark-background emblem on light surfaces,
-// white-tile trophy on dark ones.
+// Official mark + two-line "WORLD CUP / PICK'EM '26" wordmark (Archivo 800
+// uppercase, "'26" in accent) + tricolor rule. Two lines keep the app bar's
+// right cluster (icons, avatar) from being pushed on narrow screens. The mark
+// is theme-swapped so its tile always contrasts with the bar behind it:
+// dark-background emblem on light surfaces, white-tile trophy on dark ones.
 export function Logo({
   compact = false,
   light = false,
@@ -48,11 +49,19 @@ export function Logo({
         style={markStyle}
       />
       <span
-        className="td"
-        style={{ fontSize: size, color: light ? "var(--on-navy)" : "var(--text)", whiteSpace: "nowrap" }}
+        className="td flex flex-col"
+        style={{
+          fontSize: size * 0.8,
+          gap: 2,
+          color: light ? "var(--on-navy)" : "var(--text)",
+          whiteSpace: "nowrap",
+        }}
       >
-        World Cup Pick&rsquo;em{" "}
-        <span style={{ color: light ? "var(--gold)" : "var(--brand)" }}>&rsquo;26</span>
+        <span>World Cup</span>
+        <span>
+          Pick&rsquo;em{" "}
+          <span style={{ color: light ? "var(--gold)" : "var(--brand)" }}>&rsquo;26</span>
+        </span>
       </span>
       {!compact && <Trico />}
     </span>
