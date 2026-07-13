@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
 import { Logo } from "./Logo";
 import { Avatar } from "./Avatar";
-import { CompSwitcher } from "./CompSwitcher";
 import { ThemeToggle } from "./ThemeToggle";
 
 type NavItem = { href: string; label: string; icon: string };
@@ -61,7 +60,6 @@ export function Shell({
           <Link href="/dashboard" aria-label="Home" className="press" style={{ flex: "none" }}>
             <Logo />
           </Link>
-          <CompSwitcher compact />
 
           {/* Desktop inline nav */}
           <nav

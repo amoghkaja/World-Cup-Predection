@@ -13,10 +13,10 @@ export function Trico({ wide, style }: { wide?: boolean; style?: React.CSSProper
   );
 }
 
-// Official mark + "PICK'EM '26" (Archivo 800 uppercase, "'26" in accent) +
-// tricolor rule. The mark is theme-swapped so its tile always contrasts with
-// the bar behind it: dark-background emblem on light surfaces, white-tile
-// trophy on dark ones.
+// Official mark + "WORLD CUP PICK'EM '26" (Archivo 800 uppercase, "'26" in
+// accent) + tricolor rule. The mark is theme-swapped so its tile always
+// contrasts with the bar behind it: dark-background emblem on light surfaces,
+// white-tile trophy on dark ones.
 export function Logo({
   compact = false,
   light = false,
@@ -51,7 +51,7 @@ export function Logo({
         className="td"
         style={{ fontSize: size, color: light ? "var(--on-navy)" : "var(--text)", whiteSpace: "nowrap" }}
       >
-        Pick&rsquo;em{" "}
+        World Cup Pick&rsquo;em{" "}
         <span style={{ color: light ? "var(--gold)" : "var(--brand)" }}>&rsquo;26</span>
       </span>
       {!compact && <Trico />}
