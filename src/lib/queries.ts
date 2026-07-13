@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { BOARD_COOKIE, parseBoardView, type BoardView } from "@/lib/board-cookie";
@@ -31,6 +32,13 @@ export const TAG_MATCHES = "matches";
 export const TAG_TEAMS = "teams";
 export const TAG_PLAYERS = "players";
 export const TAG_LEADERBOARD = "leaderboard";
+
+// Request-time clock for server components: components must stay pure, so
+// "what time is it" lives in the data layer, deferred to request time.
+export async function requestNow(): Promise<number> {
+  await connection();
+  return Date.now();
+}
 
 // matches has 3 FKs to teams (home/away/winner) — disambiguate the embed by FK column.
 const MATCH_SELECT =

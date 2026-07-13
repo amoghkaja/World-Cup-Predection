@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getProfile, getMatches, getTeams, getPlayers } from "@/lib/queries";
+import { getProfile, getMatches, getTeams, getPlayers, requestNow } from "@/lib/queries";
 import { STAGE_LABELS, type MatchStage } from "@/lib/types";
 import { AdminMatchRow } from "@/components/AdminMatchRow";
 import { AdminSettlePanel } from "@/components/AdminSettlePanel";
@@ -13,7 +13,7 @@ export default async function AdminResultsPage() {
   if (!profile?.is_admin) redirect("/dashboard");
 
   const [matches, teams, players] = await Promise.all([getMatches(), getTeams(), getPlayers()]);
-  const now = Date.now();
+  const now = await requestNow();
 
   // The whole point of this page during the tournament: matches that have
   // kicked off but have no final result yet. Pin them on top (most recent
