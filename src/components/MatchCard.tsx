@@ -143,12 +143,15 @@ export function MatchRow({
     );
   } else if (open) {
     pickLine = (
-      <span className="pill pill-open inline-flex items-center" style={{ gap: 3 }}>
+      <span
+        className="t-sm inline-flex items-center"
+        style={{ color: "var(--brand-strong)", fontWeight: 700, gap: 3 }}
+      >
         Pick
         <Icon
           name="chevD"
-          size={12}
-          sw={2.6}
+          size={14}
+          sw={2.4}
           style={{ transform: editing ? "rotate(180deg)" : "none", transition: "transform .18s ease" }}
         />
       </span>

@@ -12,6 +12,7 @@ import { Icon } from "@/components/Icon";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { AvatarToggle } from "@/components/AvatarToggle";
 import { PointsBreakdown } from "@/components/PointsBreakdown";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,17 @@ export default async function ProfilePage() {
             <Icon name="chevR" size={18} style={{ color: "var(--text-3)" }} />
           </Link>
         ))}
+      </div>
+
+      {/* appearance */}
+      <div className="card mb-[18px] flex items-center" style={{ padding: "12px 18px", gap: 14 }}>
+        <div className="flex-1">
+          <div style={{ fontWeight: 700, fontSize: 15 }}>Appearance</div>
+          <div className="t-xs" style={{ color: "var(--text-3)" }}>
+            Light or dark — your choice sticks on this device
+          </div>
+        </div>
+        <ThemeToggle />
       </div>
 
       {/* edit display name */}

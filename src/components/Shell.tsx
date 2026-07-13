@@ -6,6 +6,7 @@ import { Icon } from "./Icon";
 import { Logo } from "./Logo";
 import { Avatar } from "./Avatar";
 import { CompSwitcher } from "./CompSwitcher";
+import { ThemeToggle } from "./ThemeToggle";
 
 type NavItem = { href: string; label: string; icon: string };
 
@@ -82,6 +83,9 @@ export function Shell({
           <span style={{ flex: 1 }} />
 
           {/* Right cluster */}
+          <span className="hidden md:block">
+            <ThemeToggle />
+          </span>
           <Link
             href="/scoring"
             aria-label="How scoring works"

@@ -40,7 +40,8 @@ export function ScoreStepper({
     <div className="flex items-center" style={{ gap: 8 }}>
       {btn(-1, "minus")}
       <output
-        className="tnum"
+        key={value}
+        className="tnum anim-pop"
         style={{
           width: 46,
           textAlign: "center",

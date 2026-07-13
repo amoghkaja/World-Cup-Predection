@@ -40,7 +40,23 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${archivo.variable} ${manrope.variable} h-full`}>
+    // suppressHydrationWarning: the head script stamps data-theme on <html>
+    // before hydration, so the attribute legitimately differs from the SSR HTML
+    <html
+      lang="en"
+      className={`${archivo.variable} ${manrope.variable} h-full`}
+      suppressHydrationWarning
+    >
+      <head>
+        {/* Apply the saved theme before first paint (no flash). No saved
+            choice → data-theme stays unset and CSS follows the system. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('wc-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}",
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <TimezoneCookie />

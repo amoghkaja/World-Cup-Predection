@@ -5,7 +5,7 @@ import type { MatchStage, PredOutcome } from "@/lib/types";
 import { savePrediction } from "@/app/actions";
 import { Icon } from "./Icon";
 import { Flag } from "./TeamBadge";
-import { ScorePicker } from "./ScorePicker";
+import { ScoreStepper } from "./ScoreStepper";
 import { OutcomeToggle, type Outcome } from "./OutcomeToggle";
 
 /**
@@ -123,50 +123,43 @@ export function PredictionForm({
         away={match.away_team?.name ?? awayCode}
       />
 
-      {/* scoreboard-style score entry: one tap per team */}
-      <div className="flex flex-col" style={{ gap: compact ? 10 : 14, marginTop: compact ? 2 : 6 }}>
-        {(
-          [
-            { team: match.home_team, code: homeCode, value: home, set: setHome },
-            { team: match.away_team, code: awayCode, value: away, set: setAway },
-          ] as const
-        ).map((s) => (
-          <div key={s.code} className="flex flex-col" style={{ gap: 6 }}>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center" style={{ gap: 8 }}>
-                <Flag flag={s.team?.flag_emoji} name={s.team?.name} size="sm" />
-                <span
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontWeight: 800,
-                    fontSize: 13,
-                    letterSpacing: "0.02em",
-                  }}
-                >
-                  {s.code}
-                </span>
-                <span className="t-xs truncate" style={{ color: "var(--text-3)", maxWidth: 140 }}>
-                  {s.team?.name}
-                </span>
-              </span>
-              <span
-                key={s.value}
-                className="tnum anim-pop"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 800,
-                  fontSize: 18,
-                  color: "var(--brand-strong)",
-                  minWidth: 16,
-                  textAlign: "right",
-                }}
-              >
-                {s.value}
-              </span>
-            </div>
-            <ScorePicker value={s.value} onChange={s.set} disabled={disabled} label={s.code} />
+      {/* score entry — the production stepper */}
+      <div
+        className="flex items-center justify-center"
+        style={{ gap: compact ? 16 : 22, marginTop: compact ? 2 : 6 }}
+      >
+        <div className="text-center">
+          {!compact && <Flag flag={match.home_team?.flag_emoji} name={match.home_team?.name} />}
+          <div
+            className="t-xs"
+            style={{ color: "var(--text-3)", margin: compact ? "0 0 6px" : "6px 0 8px", fontWeight: 700 }}
+          >
+            {homeCode}
           </div>
-        ))}
+          <ScoreStepper value={home} disabled={disabled} accent="var(--brand)" onChange={setHome} />
+        </div>
+        <span
+          aria-hidden
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 800,
+            fontSize: compact ? 22 : 26,
+            color: "var(--line-strong)",
+            marginTop: compact ? 18 : 20,
+          }}
+        >
+          :
+        </span>
+        <div className="text-center">
+          {!compact && <Flag flag={match.away_team?.flag_emoji} name={match.away_team?.name} />}
+          <div
+            className="t-xs"
+            style={{ color: "var(--text-3)", margin: compact ? "0 0 6px" : "6px 0 8px", fontWeight: 700 }}
+          >
+            {awayCode}
+          </div>
+          <ScoreStepper value={away} disabled={disabled} accent="var(--brand)" onChange={setAway} />
+        </div>
       </div>
 
       {isKnockout && (

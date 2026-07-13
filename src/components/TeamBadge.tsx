@@ -30,12 +30,7 @@ export function Flag({
   if (iso) {
     inner = (
       // eslint-disable-next-line @next/next/no-img-element -- tiny external flag SVG, no Image optimization needed
-      <img
-        src={`https://flagcdn.com/${iso}.svg`}
-        alt=""
-        loading="lazy"
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
+      <img src={`https://flagcdn.com/${iso}.svg`} alt="" loading="lazy" />
     );
   } else {
     inner = flag || "🏳️";

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/queries";
 import { sanitizeNext } from "@/lib/redirects";
@@ -32,6 +33,16 @@ function HeroPanel() {
       >
         26
       </span>
+      {/* official WC26 mark — dark variant sits on the navy hero in both themes */}
+      <Image
+        src="/wc26-logo-dark.webp"
+        alt="FIFA World Cup 2026"
+        width={124}
+        height={192}
+        priority
+        className="absolute anim-pop"
+        style={{ top: 26, left: 26, width: "min(19vw, 108px)", height: "auto", zIndex: 3 }}
+      />
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none"
@@ -120,12 +131,7 @@ export default async function LoginPage({
             {LOGIN_FLAGS.map((iso) => (
               <span key={iso} className="flag sm" aria-hidden>
                 {/* eslint-disable-next-line @next/next/no-img-element -- tiny external flag, no optimization needed */}
-                <img
-                  src={`https://flagcdn.com/${iso}.svg`}
-                  alt=""
-                  loading="lazy"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+                <img src={`https://flagcdn.com/${iso}.svg`} alt="" loading="lazy" />
               </span>
             ))}
             <span className="t-xs" style={{ color: "var(--text-3)" }}>

@@ -68,6 +68,11 @@
   --shadow-md: 0 4px 14px rgb(16 23 32 / 0.08);
   --shadow-lg: 0 18px 44px rgb(16 23 32 / 0.16);
 
+  /* active desktop-nav pill (navy on light; accent on dark, where the bar
+     itself is already near-navy) */
+  --nav-on-bg: var(--navy);
+  --nav-on-fg: var(--on-navy);
+
   --font-display: var(--font-archivo), system-ui, sans-serif;
   --font-body: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -86,9 +91,12 @@
   --danger: var(--bad);
 }
 
+/* ---- night broadcast (dark) tokens -------------------------------------
+   Theme resolution: an explicit choice saved by the toggle wins
+   (html[data-theme="light"|"dark"]); with no choice, follow the system.
+   The two dark blocks below MUST stay identical — keep them in sync. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* night broadcast — navy studio */
+  :root:not([data-theme="light"]) {
     --brand: oklch(0.72 0.12 255);
     --brand-strong: oklch(0.8 0.11 253);
     --brand-soft: oklch(0.32 0.06 255);
@@ -135,7 +143,62 @@
     --shadow-sm: 0 1px 2px #0006;
     --shadow-md: 0 6px 16px #0007;
     --shadow-lg: 0 20px 48px #0009, 0 8px 18px #0007;
+
+    --nav-on-bg: var(--brand);
+    --nav-on-fg: var(--on-brand);
   }
+}
+
+:root[data-theme="dark"] {
+  --brand: oklch(0.72 0.12 255);
+  --brand-strong: oklch(0.8 0.11 253);
+  --brand-soft: oklch(0.32 0.06 255);
+  --brand-ring: oklch(0.72 0.12 255 / 0.42);
+  --on-brand: #0a1220;
+
+  --navy: #0a1424;
+  --navy-2: #122238;
+  --on-navy: #f2f5f9;
+  --brand-grad: linear-gradient(165deg, #0a1424 0%, #122238 60%, #17304e 100%);
+
+  --gold: oklch(0.82 0.13 84);
+  --gold-strong: oklch(0.86 0.125 84);
+  --gold-soft: oklch(0.34 0.07 78);
+  --on-gold: #171106;
+
+  --blue: oklch(0.72 0.12 255);
+  --blue-strong: oklch(0.8 0.11 253);
+  --blue-soft: oklch(0.32 0.06 255);
+  --red: oklch(0.68 0.17 27);
+  --red-strong: oklch(0.76 0.15 27);
+  --red-soft: oklch(0.34 0.09 27);
+  --green: oklch(0.74 0.14 155);
+  --green-strong: oklch(0.82 0.13 155);
+  --green-soft: oklch(0.32 0.065 155);
+
+  --bg: oklch(0.185 0.02 255);
+  --surface: oklch(0.23 0.022 255);
+  --surface-2: oklch(0.27 0.024 255);
+  --elev: oklch(0.245 0.023 255);
+  --line: oklch(0.315 0.026 255);
+  --line-strong: oklch(0.41 0.03 255);
+  --text: oklch(0.955 0.007 250);
+  --text-2: oklch(0.78 0.015 250);
+  --text-3: oklch(0.6 0.018 252);
+
+  --good: var(--green);
+  --good-soft: var(--green-soft);
+  --on-good: #06130b;
+  --bad: var(--red);
+  --bad-soft: var(--red-soft);
+  --on-bad: #1a0a07;
+
+  --shadow-sm: 0 1px 2px #0006;
+  --shadow-md: 0 6px 16px #0007;
+  --shadow-lg: 0 20px 48px #0009, 0 8px 18px #0007;
+
+  --nav-on-bg: var(--brand);
+  --nav-on-fg: var(--on-brand);
 }
 
 /* Tailwind theme mapping (inline = utilities resolve vars at runtime so theming works) */
@@ -253,15 +316,25 @@ h1, h2, h3, h4 {
   .pill-pts { background: var(--gold-soft); color: var(--gold-strong); }
   .pill-acc { background: var(--brand-soft); color: var(--brand-strong); }
 
-  /* flags — broadcast rounded-rect (was a circle in v1) */
+  /* flags — broadcast rounded-rect (was a circle in v1).
+     The ring lives on ::after so it paints ABOVE the image, and the image
+     inherits the radius — otherwise the box background peeks through the
+     antialiased corners (white leak on light flags like Japan). */
   .flag {
+    position: relative;
     display: inline-grid; place-items: center;
     width: 27px; height: 20px; border-radius: 4px;
     background: var(--surface-2);
-    box-shadow: inset 0 0 0 1px rgb(16 23 32 / 0.12);
     font-size: 13px; line-height: 1; overflow: hidden; flex: none;
     color: var(--text-2); font-weight: 800;
   }
+  .flag::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgb(16 23 32 / 0.14);
+    pointer-events: none;
+  }
+  .flag img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+  .flag:has(img) { background: transparent; }
   .flag.lg { width: 42px; height: 31.5px; border-radius: 5px; font-size: 20px; }
   .flag.xl { width: 58px; height: 43.5px; border-radius: 6px; font-size: 28px; }
   .flag.sm { width: 21px; height: 15.75px; border-radius: 3px; font-size: 10px; }
@@ -269,7 +342,7 @@ h1, h2, h3, h4 {
   .dot-live { width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: livepulse 1.4s ease-in-out infinite; }
 
   .seg { display: inline-flex; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: calc(var(--radius) - 2px); padding: 3px; }
-  .seg-btn { border: none; background: transparent; color: var(--text-2); font-family: var(--font-display); font-weight: 700; font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; min-height: 40px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px; transition: background .18s ease, color .18s ease, box-shadow .18s ease; cursor: pointer; }
+  .seg-btn { border: none; background: transparent; color: var(--text-2); font-weight: 650; font-size: 13.5px; min-height: 40px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px; transition: background .18s ease, color .18s ease, box-shadow .18s ease; cursor: pointer; }
   .seg-btn.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line); }
   .seg-count { background: var(--gold); color: var(--on-gold); border-radius: 999px; font-size: 11px; padding: 2px 7px; font-weight: 800; }
 
@@ -306,32 +379,10 @@ h1, h2, h3, h4 {
     white-space: nowrap;
   }
   .dnav-btn:hover { background: var(--surface-2); color: var(--text); }
-  .dnav-btn.on { background: var(--navy); color: var(--on-navy); }
-  /* dark bar is itself near-navy — flip the active pill to the accent */
-  @media (prefers-color-scheme: dark) {
-    .dnav-btn.on { background: var(--brand); color: var(--on-brand); }
-  }
+  .dnav-btn.on { background: var(--nav-on-bg); color: var(--nav-on-fg); }
 
   /* navy hero panel (login) */
   .hero-navy { background: var(--brand-grad); color: var(--on-navy); position: relative; overflow: hidden; }
-
-  /* score picker — tap a digit, done */
-  .scp { display: flex; gap: 4px; }
-  .scp button {
-    flex: 1; min-width: 0; height: 40px; border-radius: 9px;
-    border: 1px solid var(--line); background: var(--surface);
-    font-family: var(--font-display); font-weight: 800; font-size: 15px;
-    font-variant-numeric: tabular-nums; color: var(--text-2); cursor: pointer;
-    transition: background .13s ease, color .13s ease, border-color .13s ease, transform .1s ease;
-    padding: 0;
-  }
-  .scp button:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
-  .scp button:active:not(:disabled) { transform: scale(0.92); }
-  .scp button.on {
-    background: var(--brand); border-color: var(--brand); color: var(--on-brand);
-    animation: pop-num .18s ease-out;
-  }
-  .scp button:disabled { opacity: 0.45; cursor: not-allowed; }
 
   /* hover affordance on pointers that have hover; plain press feedback on touch */
   .lift { transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
