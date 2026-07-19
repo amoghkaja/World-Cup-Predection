@@ -42,7 +42,7 @@ export const PODIUM_EARLY = [50, 50, 50];
 export const PODIUM_LATE = [50, 50, 50];
 
 export const GROUP_QUALIFIER_POINTS = 4; // per correct team (winner / runner-up)
-export const GOLDEN_BOOT_POINTS = 50; // correct top-scorer nation (pre-tournament long-shot)
+export const GOLDEN_BOOT_POINTS = 100; // correct top-scorer nation (pre-tournament long-shot)
 
 /** The actual result of a finished match from the home team's perspective. */
 export function actualOutcome(home: number, away: number): PredOutcome {
